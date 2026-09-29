@@ -1,0 +1,38 @@
+{
+  "jql": "project = RAD AND statusCategory != Done",
+  "referenceDate": null,
+  "timezone": null,
+  "businessDays": { "workingDays": [1, 2, 3, 4, 5] },
+  "dueSoonBusinessDays": 3,
+  "stuckThresholdBusinessDays": {
+    "default": 4,
+    "In Progress": 5,
+    "In Review": 2,
+    "Ready for QA": 2,
+    "In QA": 3
+  },
+  "blockedStatuses": ["Blocked"],
+  "bounce": {
+    "fromStatuses": ["In QA", "Ready for QA"],
+    "toStatuses": ["In Progress"],
+    "minCount": 2
+  },
+  "highPriorities": ["Highest", "High"],
+  "severity": {
+    "rules": {
+      "overdue": "critical",
+      "dueSoonNotStarted": "at_risk",
+      "stuck": "at_risk",
+      "blocked": "at_risk",
+      "blockedInComments": "at_risk",
+      "bouncing": "at_risk",
+      "unassignedHighPriority": "at_risk",
+      "vague": "at_risk"
+    },
+    "flagGroups": { "blocked": ["blocked", "blockedInComments"] },
+    "escalateAtRiskCount": 2
+  },
+  "claude": { "enabled": true, "model": "claude-sonnet-5-5", "batchSize": 10, "effort": "low" },
+  "apply": { "label": "at-risk", "levels": ["critical", "at_risk"] },
+  "seed": { "label": "seed-demo", "refreshViaStatus": "To Do" }
+}

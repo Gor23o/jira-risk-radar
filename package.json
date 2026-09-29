@@ -1,0 +1,22 @@
+{
+  "name": "jira-risk-radar",
+  "version": "0.1.0",
+  "description": "CLI that flags at-risk Jira issues with rules + Claude and writes an HTML report",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "radar": "node src/cli.js",
+    "seed": "node scripts/seed.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.2"
+  }
+}
