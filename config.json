@@ -35,5 +35,5 @@
   },
   "claude": { "enabled": true, "model": "claude-sonnet-5-5", "batchSize": 10, "effort": "low" },
   "apply": { "label": "at-risk", "levels": ["critical", "at_risk"] },
-  "seed": { "projectKey": "SCRUM", "label": "seed-demo", "refreshViaStatus": "To Do" }
+  "seed": { "projectKey": "SCRUM", "label": "seed-demo", "refreshViaStatus": "To Do", "demoAging": true }
 }

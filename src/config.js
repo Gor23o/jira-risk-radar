@@ -78,6 +78,9 @@ const configSchema = z
       projectKey: z.string().regex(/^[A-Z][A-Z0-9_]+$/, 'must be a Jira project key like "SCRUM"'),
       label: text,
       refreshViaStatus: text,
+      // While demo data is in use: simulate the waiting period for seeded "stuck" scenarios
+      // on every run (same as --demo-aging). Turn off when the demo is over.
+      demoAging: z.boolean(),
     }),
   })
   // Rules that involve more than one field.

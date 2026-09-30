@@ -19,8 +19,8 @@ Quality matters more than speed.
 - **Scheduled runs** happen in GitHub Actions (`.github/workflows/risk-radar.yml`): daily at
   05:00 UTC plus a manual "Run workflow" button. Secrets live in the GitHub environment `.env`
   (environment secrets, not repository secrets). Every run ends by emailing the result via
-  Gmail (`scripts/send-email.js`, content built by the pure `src/notify/email.js`; phase 5 adds
-  the risk summary to it). Sending a real email needs the user's go-ahead, so use `--dry-run`
+  Gmail (`scripts/send-email.js`, content built by the pure `src/notify/email.js`): risk counts in
+  the subject, per-assignee table, and every flagged issue with its evidence. Sending a real email needs the user's go-ahead, so use `--dry-run`
   locally. The workflow is **report-only**. Adding
   `--apply` to it needs the user's explicit decision. When a phase changes the CLI's output or
   needs a new secret, update the workflow in the same phase (phase 4: `ANTHROPIC_API_KEY`,
@@ -73,7 +73,9 @@ Pipeline: **fetch → normalize → rules → Claude → merge → report → (a
      (rows = assignees including "Unassigned"; columns = critical, at_risk, ok, total;
      sorted by critical desc, then at_risk desc). Numbers come from a pure `summarize(results)`.
   3. Issue list, sorted per the severity model.
-- `src/cli.js` orchestrates and holds no business logic.
+- `src/pipeline.js` (`runRadar`) is the one pipeline: fetch → demo aging → rules → merge →
+  summarize. The CLI table, `--json` report, CI summary and email all render its output.
+- `src/cli.js` parses flags and prints; it holds no business logic.
 
 ### config.json shape
 
@@ -98,7 +100,7 @@ Pipeline: **fetch → normalize → rules → Claude → merge → report → (a
   },
   "claude": { "enabled": true, "model": "claude-sonnet-5-5", "batchSize": 10, "effort": "low" },
   "apply": { "label": "at-risk", "levels": ["critical", "at_risk"] },
-  "seed": { "projectKey": "SCRUM", "label": "seed-demo", "refreshViaStatus": "To Do" }
+  "seed": { "projectKey": "SCRUM", "label": "seed-demo", "refreshViaStatus": "To Do", "demoAging": true }
 }
 ```
 
@@ -233,7 +235,7 @@ One commit per phase. Stop after each phase for the user to verify.
 | 2 | Seed demo data | `scripts/seed-data.js` (~30 scenarios), `scripts/seed.js` (`seed`, `--refresh`, `--reset`), demo runbook in README | Board shows the issues; refresh and reset behave as described in "Seed design" |
 | 3 | Rule engine | `rules/dates.js`, `rules/statusHistory.js`, six rules, `rules/index.js`, rules-only table in the CLI, `seed/aging.js` + `seed --verify` for instant checks | Rule tests green (including the refresh-is-not-a-bounce case); scenario acceptance test passes on demo day and with aging; `seed --verify --demo-aging` 33/33 live |
 | 4 | Claude assessment | Verify SDK on docs.claude.com, then `ai/schema.js`, `ai/prompt.js`, `ai/assess.js` | Fixture tests for parsing + unavailable handling; one real run with the user's OK |
-| 5 | Merge + report | `merge/merge.js`, `report/summarize.js`, `report/html.js` | Merge + summarize tests green; the HTML report opens and reads well |
+| 5 | Report | `merge/merge.js` and `report/summarize.js` were pulled forward into phase 3 so the daily email shows risk levels; left: `report/html.js` | The HTML report opens and reads well |
 | 6 | `--apply` | `jira/apply.js` with `--dry-run`; label + comment for `apply.levels`, skip already-labelled issues | Dry run lists the right issues; the real run writes them; a second run changes nothing |
 | 7 | Polish | README: what, setup, run, demo runbook, design decisions, limitations, next steps, "How this was built with Claude" (CLAUDE.md, plan mode, decisions changed during planning: severity model + flag groups, business days, no refusal fallback, seed design). Sample report | A fresh clone works by following the README only |
 
@@ -267,7 +269,10 @@ healthy-vs-stuck contrast inside a column.
   `simulated: true`, and every command using it prints how many issues were aged. Never apply
   it to anything else. It replaces the old "future `--reference-date`" fallback, which shifted
   due-date meanings.
-- `npm run seed -- --verify [--demo-aging]` (read-only) runs the rules on the live seeded issues
+- **`seed.demoAging: true`** in config.json turns demo aging on for *every* run, including the
+  scheduled GitHub run and its email, so results show "stuck" from the day after seeding (user
+  requirement). Every output states which issues were aged. Set it to `false` when the demo is over.
+- `npm run seed -- --verify [--demo-aging] [--reference-date D]` (read-only) runs the rules on the live seeded issues
   and prints ✓/✗ per scenario against `expect`, with hints for un-aged stuck scenarios and due
   dates anchored to another day (fix: `--refresh`).
 

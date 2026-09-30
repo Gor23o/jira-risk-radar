@@ -87,7 +87,13 @@ npm run seed                              # create the 33 issues
 npm run seed -- --verify --demo-aging     # ✓/✗ per scenario: does the radar find what it should?
 npm run radar -- --no-ai --demo-aging     # the risk table for the whole project
 ```
-On a later day, run `npm run seed -- --refresh` first so due dates are relative to today again.
+While `"demoAging": true` is set under `seed` in `config.json`, **every** run applies it
+automatically, including the daily GitHub run and its email. So from the day after seeding,
+the email already shows stuck issues. Every output says which issues were aged. Set it to
+`false` when the demo is over.
+
+Preview what a later day's run will say: `npm run seed -- --verify --demo-aging --reference-date 2026-10-01`.
+After a few days, run `npm run seed -- --refresh` so due dates are relative to today again.
 
 **What `--demo-aging` does, and why it's honest.** Jira can't backdate, so a freshly seeded issue
 has been in its column for zero days. Only one rule depends on elapsed time: *stuck*. Everything
