@@ -1,9 +1,10 @@
 # Jira Risk Radar
 
-A command-line tool that scans Jira issues, flags the ones at risk of slipping, and writes
-a sorted HTML report. Deterministic rules catch the measurable problems (overdue, stuck,
+A command-line tool that scans Jira issues, flags the ones at risk of slipping, and emails
+a sorted risk report every day. Deterministic rules catch the measurable problems (overdue, stuck,
 blocked, bouncing back from QA, unassigned high-priority work). Claude adds judgment on
-top: blocker language hidden in comments, and vague tickets with no acceptance criteria.
+top: blocker language hidden in comments, vague tickets with no acceptance criteria, and a
+plain-language reason plus a suggested next step for each risky issue.
 
 > Status: work in progress. Built in phases; see `CLAUDE.md` → "Build plan".
 

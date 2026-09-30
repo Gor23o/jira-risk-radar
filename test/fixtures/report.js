@@ -14,7 +14,9 @@ export const report = {
   referenceDate: '2026-10-01',
   timezone: 'Asia/Yerevan',
   jql: 'project = SCRUM AND statusCategory != Done',
-  ai: 'off',
+  ai: 'partial',
+  aiModel: 'claude-sonnet-5-5',
+  aiUsage: { inputTokens: 12000, outputTokens: 3000, costUsd: 0.054, calls: 2, issues: 3 },
   demoAging: { applied: true, aged: ['SCRUM-20'] },
   warnings: [],
   summary: {
@@ -35,6 +37,7 @@ export const report = {
         { rule: 'overdue', source: 'rule', severity: 'critical', message: 'Past its due date', evidence: 'Due 2026-09-29, 2 days ago' },
         { rule: 'stuck', source: 'rule', severity: 'at_risk', message: 'Stuck in In Review', evidence: 'In Review for 6 business days since 2026-09-23 (threshold 2)' },
       ],
+      ai: { status: 'ok', risk_level: 'critical', reason: 'Late & waiting on <review>.', suggested_action: 'Ask the reviewer for a date today.', flags: [] },
     },
     {
       issue: issue('SCRUM-39', 'PCI compliance fixes', 'To Do', { assignee: null }),
@@ -42,6 +45,7 @@ export const report = {
       problems: 1,
       escalated: false,
       flags: [{ rule: 'unassignedHighPriority', source: 'rule', severity: 'at_risk', message: 'High priority with no owner', evidence: 'Highest priority, unassigned' }],
+      ai: { status: 'unavailable', reason: 'Claude declined to assess this batch' },
     },
     { issue: issue('SCRUM-9', 'Saved addresses', 'To Do'), level: 'ok', problems: 0, escalated: false, flags: [] },
   ],

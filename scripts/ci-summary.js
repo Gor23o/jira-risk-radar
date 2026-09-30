@@ -14,6 +14,22 @@ export function demoAgingNote({ demoAging }) {
   return `Demo aging: the waiting period was simulated for ${demoAging.aged.length} seeded demo issue(s) (${demoAging.aged.join(', ')}). All other data is live from Jira.`;
 }
 
+/** "Claude: on (claude-sonnet-5-5, about $0.041)" */
+export function aiLine({ ai, aiModel, aiUsage }) {
+  if (ai === 'off') return 'Claude: off';
+  const cost = aiUsage?.costUsd == null ? '' : `, about $${aiUsage.costUsd.toFixed(3)}`;
+  return `Claude: ${ai} (${aiModel}${cost})`;
+}
+
+/** Claude's view of one result, for the "Why" column. */
+export function claudeNotes({ ai, level }) {
+  if (ai?.status === 'unavailable') return [`_Claude unavailable: ${ai.reason}_`];
+  if (ai?.status !== 'ok' || level === 'ok') return [];
+  const notes = [`🤖 ${ai.reason}`];
+  if (ai.suggested_action && ai.suggested_action !== 'None') notes.push(`➡️ **Next:** ${ai.suggested_action}`);
+  return notes;
+}
+
 /** @param {object} report - output of runRadar / `npm run radar -- --json` */
 export function renderSummary(report) {
   const { summary, results } = report;
@@ -24,7 +40,7 @@ export function renderSummary(report) {
   }
   const note = demoAgingNote(report);
   if (note) lines.push(`> ${note}`, '');
-  lines.push(`JQL: \`${cell(report.jql)}\` · Claude: ${report.ai}`, '');
+  lines.push(`JQL: \`${cell(report.jql)}\` · ${aiLine(report)}`, '');
 
   lines.push('### By assignee', '', '| Assignee | Critical | At risk | OK | Total |', '|---|---|---|---|---|');
   for (const p of summary.byAssignee) lines.push(`| ${cell(p.name)} | ${p.critical} | ${p.at_risk} | ${p.ok} | ${p.total} |`);
@@ -33,8 +49,13 @@ export function renderSummary(report) {
   lines.push('', `### Needs attention (${flagged.length})`, '');
   if (flagged.length) {
     lines.push('| Level | Issue | Summary | Status | Assignee | Due | Why |', '|---|---|---|---|---|---|---|');
-    for (const { issue, level, flags, escalated } of flagged) {
-      const why = flags.map((f) => `**${f.message}**: ${f.evidence}`).join('<br>') + (escalated ? '<br>_Escalated: several distinct problems_' : '');
+    for (const result of flagged) {
+      const { issue, level, flags, escalated } = result;
+      const why = [
+        ...flags.map((f) => `**${f.message}**: ${f.evidence}`),
+        ...(escalated ? ['_Escalated: several distinct problems_'] : []),
+        ...claudeNotes(result),
+      ].join('<br>');
       lines.push(
         `| ${LEVEL[level]} | [${cell(issue.key)}](${issue.url}) | ${cell(issue.summary)} | ${cell(issue.status.name)} | ` +
           `${cell(issue.assignee?.name ?? 'Unassigned')} | ${cell(issue.dueDate)} | ${cell(why)} |`,

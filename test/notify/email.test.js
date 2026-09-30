@@ -33,6 +33,14 @@ describe('buildEmail: successful run', () => {
     expect(email.html).toContain('<strong>High priority with no owner</strong>: Highest priority, unassigned');
   });
 
+  it("includes Claude's reason and next step, escaped, and notes when Claude was unavailable", () => {
+    expect(email.text).toContain('    Claude: Late & waiting on <review>.');
+    expect(email.text).toContain('    Next step: Ask the reviewer for a date today.');
+    expect(email.text).toContain('    Claude unavailable: Claude declined to assess this batch');
+    expect(email.html).toContain('<strong>Claude:</strong> Late &amp; waiting on &lt;review&gt;.');
+    expect(email.html).toContain('Claude: partial (claude-sonnet-5-5, about $0.054)');
+  });
+
   it('includes the per-assignee counts', () => {
     expect(email.text).toContain('Unassigned: 0 critical, 1 at risk, 0 ok');
     expect(email.html).toContain('>Unassigned</td>');

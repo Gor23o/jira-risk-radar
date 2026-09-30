@@ -7,6 +7,7 @@
 //   add --dry-run to seed/refresh/reset to see the plan without writing to Jira
 //   add --demo-aging to --verify to check "stuck" scenarios without waiting (see src/seed/aging.js)
 //   add --reference-date YYYY-MM-DD to --verify to preview what a later day's run will say
+//   add --no-ai to --verify to skip Claude (it costs a few cents per check)
 //
 // See CLAUDE.md → "Seed design" for why seeding and refreshing are separate steps.
 
@@ -15,10 +16,8 @@ import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { loadConfig } from '../src/config.js';
 import { createJiraClient, readJiraEnv } from '../src/jira/client.js';
-import { fetchIssues } from '../src/jira/index.js';
+import { runRadar } from '../src/pipeline.js';
 import { addBusinessDays } from '../src/rules/dates.js';
-import { runRules } from '../src/rules/index.js';
-import { applyDemoAging } from '../src/seed/aging.js';
 import { describeScenario, findSeedIssues, preflight, transitionTo } from '../src/seed/jira.js';
 import { createFields, dueDateFor, refreshTransitions, resolveAssignee, toAdf } from '../src/seed/plan.js';
 import { scenarios } from './seed-data.js';
@@ -30,6 +29,7 @@ const { values: args } = parseArgs({
     verify: { type: 'boolean', default: false },
     'demo-aging': { type: 'boolean', default: false },
     'reference-date': { type: 'string' },
+    'no-ai': { type: 'boolean', default: false },
     'dry-run': { type: 'boolean', default: false },
     yes: { type: 'boolean', default: false },
   },
@@ -45,7 +45,10 @@ if (args['reference-date'] && !args.verify) {
 }
 
 dotenv.config({ quiet: true });
-const config = await loadConfig('config.json', { overrides: { noAi: true, referenceDate: args['reference-date'] } });
+// Claude only matters for --verify; --no-ai skips it (and its cost).
+const config = await loadConfig('config.json', {
+  overrides: { noAi: !args.verify || args['no-ai'], referenceDate: args['reference-date'] },
+});
 const client = createJiraClient(readJiraEnv());
 const dryRun = args['dry-run'];
 const today = config.referenceDate;
@@ -114,43 +117,57 @@ async function seed() {
 
 async function verify() {
   const jql = `project = ${config.seed.projectKey} AND labels = "${label}" ORDER BY key ASC`;
-  let { issues } = await fetchIssues({ ...config, jql });
-  if (!issues.length) throw new Error(`No issues labelled "${label}" found. Run \`npm run seed\` first.`);
-
-  let aged = [];
-  if (args['demo-aging']) ({ issues, aged } = applyDemoAging(issues, { scenarios, config }));
-  const bySummary = new Map(issues.map((i) => [i.summary, i]));
+  const aging = args['demo-aging'] || config.seed.demoAging;
+  // Same pipeline as the daily run, so --verify checks exactly what the email will say.
+  const report = await runRadar({ ...config, jql }, { demoAging: aging });
+  if (!report.results.length) throw new Error(`No issues labelled "${label}" found. Run \`npm run seed\` first.`);
+  const bySummary = new Map(report.results.map((r) => [r.issue.summary, r]));
   const sorted = (list) => [...list].sort().join(', ') || '—';
 
   console.log(`Verifying ${scenarios.length} scenarios against live Jira as of ${today}` +
-    (args['demo-aging'] ? `, demo aging simulated for ${aged.length} issue(s)` : '') + '\n');
+    (aging ? `, demo aging simulated for ${report.demoAging.aged.length} issue(s)` : '') + `, Claude: ${report.ai}\n`);
 
   let failures = 0;
   let dueDrift = 0;
   let unaged = 0;
+  const claude = { checked: 0, matched: 0 };
   for (const scenario of scenarios) {
-    const issue = bySummary.get(scenario.summary);
-    if (!issue) {
+    const result = bySummary.get(scenario.summary);
+    if (!result) {
       failures++;
       console.log(`✗ ${'(missing)'.padEnd(9)} ${scenario.summary}: not found in Jira`);
       continue;
     }
-    const flags = runRules(issue, config);
+    const { issue, flags, ai } = result;
     const expected = sorted(scenario.expect);
-    const actual = sorted(flags.map((f) => f.rule));
+    const actual = sorted(flags.filter((f) => f.source === 'rule').map((f) => f.rule));
     const ok = expected === actual;
     if (!ok) failures++;
     if (issue.dueDate !== dueDateFor(scenario, today, workingDays)) dueDrift++;
     if (!ok && scenario.expect.includes('stuck') && !actual.includes('stuck')) unaged++;
 
-    const ai = scenario.expectAi.length ? `   (Claude, phase 4: ${scenario.expectAi.join(', ')})` : '';
-    console.log(`${ok ? '✓' : '✗'} ${issue.key.padEnd(9)} ${scenario.summary.padEnd(46)} ${actual}${ok ? '' : `   expected: ${expected}`}${ai}`);
+    // Claude's findings are judgment, so they're reported but never fail the check.
+    let claudeText = '';
+    if (ai?.status === 'ok') {
+      const expectedAi = sorted(scenario.expectAi);
+      const actualAi = sorted(ai.flags.map((f) => f.rule));
+      claude.checked++;
+      if (expectedAi === actualAi) claude.matched++;
+      claudeText = `   Claude ${expectedAi === actualAi ? '✓' : '≠'} ${actualAi}${expectedAi === actualAi ? '' : ` (expected ${expectedAi})`}`;
+    } else if (ai?.status === 'unavailable') {
+      claudeText = `   Claude ? unavailable (${ai.reason})`;
+    } else if (scenario.expectAi.length) {
+      claudeText = `   (Claude off; would check: ${scenario.expectAi.join(', ')})`;
+    }
+    console.log(`${ok ? '✓' : '✗'} ${issue.key.padEnd(9)} ${scenario.summary.padEnd(46)} ${actual}${ok ? '' : `   expected: ${expected}`}${claudeText}`);
   }
 
   const passed = scenarios.length - failures;
-  console.log(`\n${passed}/${scenarios.length} scenarios match.`);
+  console.log(`\nRules: ${passed}/${scenarios.length} scenarios match.`);
+  if (claude.checked) console.log(`Claude: ${claude.matched}/${claude.checked} scenarios as expected (judgment, reported only).`);
+  if (report.aiUsage?.costUsd != null) console.log(`Claude cost for this check: about $${report.aiUsage.costUsd.toFixed(3)}.`);
   if (dueDrift && failures) console.log(`Note: ${dueDrift} due date(s) were anchored to another day. Run \`npm run seed -- --refresh\` to re-anchor them to today.`);
-  if (unaged && !args['demo-aging']) console.log(`Note: ${unaged} "stuck" scenario(s) haven't aged yet. Add --demo-aging to simulate the wait.`);
+  if (unaged && !aging) console.log(`Note: ${unaged} "stuck" scenario(s) haven't aged yet. Add --demo-aging to simulate the wait.`);
   if (failures) process.exitCode = 1;
 }
 
