@@ -18,7 +18,10 @@ Quality matters more than speed.
   `--no-ai` or fixtures for routine checks.
 - **Scheduled runs** happen in GitHub Actions (`.github/workflows/risk-radar.yml`): daily at
   05:00 UTC plus a manual "Run workflow" button. Secrets live in the GitHub environment `.env`
-  (environment secrets, not repository secrets). The workflow is **report-only**. Adding
+  (environment secrets, not repository secrets). Every run ends by emailing the result via
+  Gmail (`scripts/send-email.js`, content built by the pure `src/notify/email.js`; phase 5 adds
+  the risk summary to it). Sending a real email needs the user's go-ahead, so use `--dry-run`
+  locally. The workflow is **report-only**. Adding
   `--apply` to it needs the user's explicit decision. When a phase changes the CLI's output or
   needs a new secret, update the workflow in the same phase (phase 4: `ANTHROPIC_API_KEY`,
   phase 5: upload the HTML report and replace `scripts/ci-summary.js`).
