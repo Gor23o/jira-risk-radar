@@ -18,9 +18,11 @@ export class JiraError extends Error {
 export function readJiraEnv(env = process.env) {
   const missing = REQUIRED_ENV.filter((name) => !env[name]?.trim());
   if (missing.length) {
-    throw new JiraError(
-      `Missing ${missing.join(', ')}. Copy .env.example to .env and fill in your Jira details.`,
-    );
+    const fix =
+      env.GITHUB_ACTIONS === 'true'
+        ? 'Add them as repository secrets: Settings → Secrets and variables → Actions → Repository secrets.'
+        : 'Copy .env.example to .env and fill in your Jira details.';
+    throw new JiraError(`Missing ${missing.join(', ')}. ${fix}`);
   }
   return {
     baseUrl: env.JIRA_BASE_URL.trim().replace(/\/+$/, ''),

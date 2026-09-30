@@ -41,7 +41,7 @@ npm run radar -- --dump                    # print normalized issues as JSON
 npm run radar -- --jql "sprint in openSprints()"   # override the JQL for one run
 npm run radar -- --apply --dry-run         # show what --apply would write
 npm run radar -- --apply                   # writes label + comment to Jira (ask first!)
-npm run seed                               # create demo issues in RAD (ask first!)
+npm run seed                               # create demo issues in SCRUM (ask first!)
 npm run seed -- --refresh                  # demo day: restart healthy issues' clocks (ask first!)
 npm run seed -- --reset                    # delete seed-demo issues (ask first!)
 ```
@@ -72,7 +72,7 @@ Pipeline: **fetch → normalize → rules → Claude → merge → report → (a
 
 ```json
 {
-  "jql": "project = RAD AND statusCategory != Done",
+  "jql": "project = SCRUM AND statusCategory != Done",
   "referenceDate": null,
   "timezone": null,
   "businessDays": { "workingDays": [1, 2, 3, 4, 5] },
@@ -216,7 +216,7 @@ One commit per phase. Stop after each phase for the user to verify.
 | # | Phase | Deliverables | Done when |
 |---|---|---|---|
 | 0 | Scaffold | `git init`, package.json, .gitignore, .env.example, `config.json`, `src/config.js` (zod validation, referenceDate/timezone resolution), Vitest, README skeleton | `npm test` passes the config-validation tests |
-| 1 | Jira read | `jira/client.js`, `jira/search.js`, `jira/fields.js`, `jira/normalize.js`, `adf/toText.js`, `--dump` | RAD issues print as normalized JSON; ADF + normalize tests pass on fixtures |
+| 1 | Jira read | `jira/client.js`, `jira/search.js`, `jira/fields.js`, `jira/normalize.js`, `adf/toText.js`, `--dump` | SCRUM issues print as normalized JSON; ADF + normalize tests pass on fixtures |
 | 2 | Seed demo data | `scripts/seed-data.js` (~30 scenarios), `scripts/seed.js` (`seed`, `--refresh`, `--reset`), demo runbook in README | Board shows the issues; refresh and reset behave as described in "Seed design" |
 | 3 | Rule engine | `rules/dates.js`, `rules/statusHistory.js`, six rules, `rules/index.js`, rules-only table in the CLI | Rule tests green (including the refresh-is-not-a-bounce case); seeded issues flagged as expected |
 | 4 | Claude assessment | Verify SDK on docs.claude.com, then `ai/schema.js`, `ai/prompt.js`, `ai/assess.js` | Fixture tests for parsing + unavailable handling; one real run with the user's OK |
@@ -244,7 +244,7 @@ healthy-vs-stuck contrast inside a column.
   time in status. The script refuses to run if the via status is in `bounce.fromStatuses` or
   `bounce.toStatuses`, so a refresh can never look like a QA bounce. It also re-anchors all due
   dates to today + offset. Stuck candidates are left alone.
-- `npm run seed -- --reset`: deletes exactly `project = RAD AND labels = seed-demo`, after
+- `npm run seed -- --reset`: deletes exactly `project = SCRUM AND labels = seed-demo`, after
   printing the keys and asking for typed confirmation.
 - **Short-notice fallback** (seeded the same day): run with `--reference-date` = seed date +
   3 business days. Waiting statuses and In QA trip, In Progress doesn't. The contrast is between

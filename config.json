@@ -1,5 +1,5 @@
 {
-  "jql": "project = RAD AND statusCategory != Done",
+  "jql": "project = SCRUM AND statusCategory != Done",
   "referenceDate": null,
   "timezone": null,
   "businessDays": { "workingDays": [1, 2, 3, 4, 5] },

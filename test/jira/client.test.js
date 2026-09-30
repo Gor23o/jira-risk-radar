@@ -29,6 +29,11 @@ describe('readJiraEnv', () => {
     );
   });
 
+  it('points to .env locally and to repository secrets on GitHub Actions', () => {
+    expect(() => readJiraEnv({})).toThrow(/Copy \.env\.example to \.env/);
+    expect(() => readJiraEnv({ GITHUB_ACTIONS: 'true' })).toThrow(/repository secrets/);
+  });
+
   it('trims values and a trailing slash on the URL', () => {
     const env = readJiraEnv({ JIRA_BASE_URL: ' https://x.atlassian.net/ ', JIRA_EMAIL: 'a@b.c ', JIRA_API_TOKEN: ' t' });
     expect(env).toEqual({ baseUrl: 'https://x.atlassian.net', email: 'a@b.c', apiToken: 't' });
