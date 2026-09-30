@@ -20,7 +20,7 @@ export function readJiraEnv(env = process.env) {
   if (missing.length) {
     const fix =
       env.GITHUB_ACTIONS === 'true'
-        ? 'Add them as repository secrets: Settings → Secrets and variables → Actions → Repository secrets.'
+        ? 'Add them as secrets of the GitHub environment the workflow uses (see README → Scheduled runs).'
         : 'Copy .env.example to .env and fill in your Jira details.';
     throw new JiraError(`Missing ${missing.join(', ')}. ${fix}`);
   }

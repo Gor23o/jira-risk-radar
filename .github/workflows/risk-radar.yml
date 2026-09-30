@@ -29,6 +29,9 @@ jobs:
   radar:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The Jira and Anthropic secrets are stored in this GitHub environment
+    # (Settings → Environments → .env), not as repository secrets.
+    environment: ".env"
     env:
       # Runners use UTC; this makes "today" and all dates match the team's timezone.
       TZ: Asia/Yerevan

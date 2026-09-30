@@ -17,7 +17,8 @@ Quality matters more than speed.
 - Don't run the pipeline with Claude enabled without saying so, because it costs money. Use
   `--no-ai` or fixtures for routine checks.
 - **Scheduled runs** happen in GitHub Actions (`.github/workflows/risk-radar.yml`): daily at
-  05:00 UTC plus a manual "Run workflow" button. The workflow is **report-only**. Adding
+  05:00 UTC plus a manual "Run workflow" button. Secrets live in the GitHub environment `.env`
+  (environment secrets, not repository secrets). The workflow is **report-only**. Adding
   `--apply` to it needs the user's explicit decision. When a phase changes the CLI's output or
   needs a new secret, update the workflow in the same phase (phase 4: `ANTHROPIC_API_KEY`,
   phase 5: upload the HTML report and replace `scripts/ci-summary.js`).
