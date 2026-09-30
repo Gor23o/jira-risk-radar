@@ -140,7 +140,7 @@ function deepFreeze(value) {
  * @param {object} [options]
  * @param {Date} [options.now] - the current instant
  * @param {string} [options.systemTimezone] - used when config.timezone is null
- * @param {{referenceDate?: string, noAi?: boolean}} [options.overrides] - CLI flags
+ * @param {{referenceDate?: string, jql?: string, noAi?: boolean}} [options.overrides] - CLI flags
  * @returns {Readonly<object>} the validated, resolved config
  */
 export function parseConfig(raw, options = {}) {
@@ -154,6 +154,7 @@ export function parseConfig(raw, options = {}) {
   const merged = structuredClone(raw);
   if (merged && typeof merged === 'object') {
     if (overrides.referenceDate !== undefined) merged.referenceDate = overrides.referenceDate;
+    if (overrides.jql !== undefined) merged.jql = overrides.jql;
     if (overrides.noAi && merged.claude && typeof merged.claude === 'object') merged.claude.enabled = false;
   }
 

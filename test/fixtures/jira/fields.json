@@ -1,0 +1,7 @@
+[
+  { "id": "summary", "name": "Summary", "custom": false, "schema": { "type": "string", "system": "summary" } },
+  { "id": "status", "name": "Status", "custom": false, "schema": { "type": "status", "system": "status" } },
+  { "id": "customfield_10020", "name": "Sprint", "custom": true, "schema": { "type": "array", "items": "json", "custom": "com.pyxis.greenhopper.jira:gh-sprint", "customId": 10020 } },
+  { "id": "customfield_10021", "name": "Flagged", "custom": true, "schema": { "type": "array", "items": "option", "custom": "com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes", "customId": 10021 } },
+  { "id": "customfield_10099", "name": "Flagged for review", "custom": true, "schema": { "type": "string", "custom": "com.atlassian.jira.plugin.system.customfieldtypes:textfield", "customId": 10099 } }
+]

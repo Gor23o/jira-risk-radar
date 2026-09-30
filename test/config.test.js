@@ -60,6 +60,11 @@ describe('parseConfig: valid input', () => {
     expect(cfg.referenceDate).toBe('2026-11-02');
   });
 
+  it('lets the CLI --jql override config', () => {
+    const cfg = parse(baseConfig, { overrides: { jql: 'sprint in openSprints()' } });
+    expect(cfg.jql).toBe('sprint in openSprints()');
+  });
+
   it('turns Claude off with --no-ai', () => {
     const cfg = parse(baseConfig, { overrides: { noAi: true } });
     expect(cfg.claude.enabled).toBe(false);

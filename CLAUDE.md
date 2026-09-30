@@ -16,6 +16,11 @@ Quality matters more than speed.
   Reads are fine.
 - Don't run the pipeline with Claude enabled without saying so, because it costs money. Use
   `--no-ai` or fixtures for routine checks.
+- **Scheduled runs** happen in GitHub Actions (`.github/workflows/risk-radar.yml`): daily at
+  05:00 UTC plus a manual "Run workflow" button. The workflow is **report-only**. Adding
+  `--apply` to it needs the user's explicit decision. When a phase changes the CLI's output or
+  needs a new secret, update the workflow in the same phase (phase 4: `ANTHROPIC_API_KEY`,
+  phase 5: upload the HTML report and replace `scripts/ci-summary.js`).
 
 ## Stack
 
@@ -33,6 +38,7 @@ npm test                                   # vitest run
 npm run radar                              # node src/cli.js (reads config.json)
 npm run radar -- --no-ai --reference-date 2026-10-12
 npm run radar -- --dump                    # print normalized issues as JSON
+npm run radar -- --jql "sprint in openSprints()"   # override the JQL for one run
 npm run radar -- --apply --dry-run         # show what --apply would write
 npm run radar -- --apply                   # writes label + comment to Jira (ask first!)
 npm run seed                               # create demo issues in RAD (ask first!)

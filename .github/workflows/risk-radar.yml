@@ -1,0 +1,71 @@
+name: Risk Radar
+
+on:
+  schedule:
+    # Every day at 05:00 UTC (09:00 in Yerevan). GitHub may start it a few minutes late.
+    # Weekdays only: "0 5 * * 1-5"
+    - cron: "0 5 * * *"
+  workflow_dispatch: # "Run workflow" button on the Actions tab
+    inputs:
+      jql:
+        description: "Override the JQL from config.json (leave empty to use config)"
+        required: false
+        default: ""
+      reference_date:
+        description: "Evaluate as of this date, YYYY-MM-DD (leave empty for today)"
+        required: false
+        default: ""
+
+# Read-only: this workflow never writes to the repo or to Jira.
+permissions:
+  contents: read
+
+# If a manual run overlaps the scheduled one, let the first finish.
+concurrency:
+  group: risk-radar
+  cancel-in-progress: false
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Runners use UTC; this makes "today" and all dates match the team's timezone.
+      TZ: Asia/Yerevan
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Don't produce a report from code that fails its own tests.
+      - run: npm test
+
+      - name: Run Risk Radar
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          # Inputs arrive as env vars, never pasted into the script, so a crafted
+          # JQL string can't inject shell commands.
+          INPUT_JQL: ${{ inputs.jql }}
+          INPUT_REFERENCE_DATE: ${{ inputs.reference_date }}
+        run: |
+          mkdir -p out
+          args=()
+          if [ -n "$INPUT_JQL" ]; then args+=(--jql "$INPUT_JQL"); fi
+          if [ -n "$INPUT_REFERENCE_DATE" ]; then args+=(--reference-date "$INPUT_REFERENCE_DATE"); fi
+          npm run -s radar -- --dump "${args[@]}" > out/issues.json
+          node scripts/ci-summary.js out/issues.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: risk-radar-${{ github.run_number }}
+          path: out/
+          retention-days: 14
+          if-no-files-found: ignore
