@@ -45,6 +45,7 @@ npm run radar -- --dump                    # print normalized issues as JSON
 npm run radar -- --jql "sprint in openSprints()"   # override the JQL for one run
 npm run radar -- --apply --dry-run         # show what --apply would write
 npm run radar -- --apply                   # writes label + comment to Jira (ask first!)
+npm run seed -- --dry-run                  # preview the seed plan (read-only)
 npm run seed                               # create demo issues in SCRUM (ask first!)
 npm run seed -- --refresh                  # demo day: restart healthy issues' clocks (ask first!)
 npm run seed -- --reset                    # delete seed-demo issues (ask first!)
@@ -94,7 +95,7 @@ Pipeline: **fetch → normalize → rules → Claude → merge → report → (a
   },
   "claude": { "enabled": true, "model": "claude-sonnet-5-5", "batchSize": 10, "effort": "low" },
   "apply": { "label": "at-risk", "levels": ["critical", "at_risk"] },
-  "seed": { "label": "seed-demo", "refreshViaStatus": "To Do" }
+  "seed": { "projectKey": "SCRUM", "label": "seed-demo", "refreshViaStatus": "To Do" }
 }
 ```
 

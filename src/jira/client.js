@@ -115,5 +115,7 @@ export function createJiraClient({ baseUrl, email, apiToken }, deps = {}) {
     baseUrl,
     get: (path, query) => request('GET', path, { query }),
     post: (path, body) => request('POST', path, { body }),
+    put: (path, body) => request('PUT', path, { body }),
+    delete: (path, query) => request('DELETE', path, { query }),
   };
 }

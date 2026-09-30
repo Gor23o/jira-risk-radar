@@ -76,7 +76,34 @@ in repos with no commits for 60 days.
 
 ## Demo runbook
 
-_Phase 2._
+The demo backlog is 33 issues for a fictional "Checkout v2" project, defined in
+[`scripts/seed-data.js`](scripts/seed-data.js). Each one covers a risk scenario and says what the
+radar should find. All seeded issues carry the `seed-demo` label; nothing else is ever touched.
+
+**Why two steps?** Jira can't backdate, so every seeded issue enters its status on seed day.
+Seeding early and then "refreshing" the healthy issues on demo day gives a real contrast: stuck
+issues have sat for a week while healthy ones restarted their clock today.
+
+1. **At least 6 business days before the demo** (the longest stuck threshold + 1):
+   ```bash
+   npm run seed -- --dry-run   # preview; writes nothing
+   npm run seed                # create the issues
+   ```
+   It prints the earliest demo day and a fallback date.
+2. **On demo day:**
+   ```bash
+   npm run seed -- --refresh   # healthy issues re-enter their status; due dates re-anchor to today
+   npm run radar
+   ```
+3. **Optional:** `npm run radar -- --apply --dry-run` to show what would be written back to Jira.
+4. **Start over:** `npm run seed -- --reset` lists the `seed-demo` issues and deletes them after you type `yes`.
+
+**Short notice** (seeded the same day as the demo): skip the refresh and run
+`npm run radar -- --reference-date <fallback date printed by seed>`. Waiting statuses and In QA
+look stuck, In Progress doesn't. The contrast is between columns rather than within one.
+
+The refresh moves healthy issues out and back **via To Do** (`seed.refreshViaStatus`). A route
+through In Progress would look like a QA bounce, so config validation rejects bounce statuses there.
 
 ## Design decisions
 

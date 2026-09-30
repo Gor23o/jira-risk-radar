@@ -72,6 +72,8 @@ const configSchema = z
       levels: z.array(z.enum(['critical', 'at_risk'])).min(1),
     }),
     seed: z.strictObject({
+      // Jira project keys: uppercase letter first, then uppercase letters/digits/underscores.
+      projectKey: z.string().regex(/^[A-Z][A-Z0-9_]+$/, 'must be a Jira project key like "SCRUM"'),
       label: text,
       refreshViaStatus: text,
     }),
