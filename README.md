@@ -47,6 +47,23 @@ in plain text. Keep "Deployment branches" on *No restriction* and add no require
 otherwise scheduled runs will wait for approval. Each run appears as a "deployment" to `.env`
 on the repo page; that's expected.
 
+### Email results
+
+Every run, scheduled or manual, successful or failed, ends with an email: the results table
+on success, and on failure which step broke plus a link to the log. It's sent through Gmail.
+
+1. Turn on 2-Step Verification for the Google account that will send the email.
+2. Create an app password at https://myaccount.google.com/apppasswords (16 characters).
+   Your normal Google password will not work.
+3. Add three more **secrets** to the `.env` environment:
+   - `GMAIL_USER`: the sending Gmail address
+   - `GMAIL_APP_PASSWORD`: the app password
+   - `EMAIL_TO`: recipients, comma-separated (kept as a secret so addresses stay out of this public repo)
+
+If these secrets are missing, the run still passes and shows a yellow "Email not sent" warning.
+Preview an email locally without sending: `node scripts/send-email.js --issues issues.json --dry-run`.
+If `npm ci` itself fails, no email can be sent; GitHub's own failure notification covers that case.
+
 To change the schedule, edit the `cron` line: `"0 5 * * 1-5"` = weekdays only,
 `"0 5 * * 1,4"` = Monday and Thursday. Times are UTC. GitHub pauses scheduled workflows
 in repos with no commits for 60 days.

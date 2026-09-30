@@ -46,9 +46,12 @@ jobs:
       - run: npm ci
 
       # Don't produce a report from code that fails its own tests.
-      - run: npm test
+      - name: Run tests
+        id: tests
+        run: npm test
 
       - name: Run Risk Radar
+        id: radar
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
@@ -72,3 +75,25 @@ jobs:
           path: out/
           retention-days: 14
           if-no-files-found: ignore
+
+      # Runs after success AND failure, so every run sends an email. If email
+      # secrets are missing it only logs a warning; the run stays green.
+      - name: Email results
+        if: always()
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          JOB_STATUS: ${{ job.status }}
+          FAILED_STEP: ${{ steps.tests.outcome == 'failure' && 'Run tests' || steps.radar.outcome == 'failure' && 'Run Risk Radar' || '' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          INPUT_JQL: ${{ inputs.jql }}
+          INPUT_REFERENCE_DATE: ${{ inputs.reference_date }}
+        run: >
+          node scripts/send-email.js
+          --status "$JOB_STATUS"
+          --issues out/issues.json
+          --run-url "$RUN_URL"
+          --failed-step "$FAILED_STEP"
+          --jql "$INPUT_JQL"
+          --reference-date "$INPUT_REFERENCE_DATE"
