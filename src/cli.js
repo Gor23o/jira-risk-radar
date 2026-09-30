@@ -42,12 +42,14 @@ const LEVEL_LABEL = { critical: 'CRITICAL', at_risk: 'AT RISK', ok: 'ok' };
 
 /** Plain-text report; the HTML report replaces this in phase 5. */
 function printReport(report) {
-  console.log(`\nRisk Radar as of ${report.referenceDate} (${report.timezone}): ${levelCountsText(report.summary)}\n`);
-  for (const { issue, level, flags, escalated } of report.results) {
+  console.log(`\nRisk Radar as of ${report.referenceDate} (${report.timezone}): ${levelCountsText(report.summary)} · Claude: ${report.ai}\n`);
+  for (const { issue, level, flags, escalated, ai } of report.results) {
     const summary = issue.summary.length > 44 ? `${issue.summary.slice(0, 43)}…` : issue.summary;
     const why = flags.length ? flags.map((f) => f.rule).join(', ') + (escalated ? ' → escalated' : '') : '';
     console.log(`${LEVEL_LABEL[level].padEnd(9)} ${issue.key.padEnd(9)} ${issue.status.name.padEnd(13)} ${summary.padEnd(45)} ${why}`);
     for (const f of flags) console.log(`${' '.repeat(33)}↳ ${f.evidence}`);
+    if (ai?.status === 'ok' && level !== 'ok') console.log(`${' '.repeat(33)}↳ Claude: ${ai.reason} Next: ${ai.suggested_action}`);
+    if (ai?.status === 'unavailable') console.log(`${' '.repeat(33)}↳ Claude unavailable: ${ai.reason}`);
   }
   console.log('\nBy assignee:');
   for (const p of report.summary.byAssignee) {
@@ -87,6 +89,11 @@ async function main() {
   const report = await runRadar(config, { demoAging: args['demo-aging'] || config.seed.demoAging });
   for (const warning of report.warnings) console.error(`Warning: ${warning}`);
   console.error(`Found ${report.summary.total} issue(s).`);
+  if (report.aiUsage) {
+    const { calls, issues, inputTokens, outputTokens, costUsd } = report.aiUsage;
+    const cost = costUsd == null ? '' : `, about $${costUsd.toFixed(3)}`;
+    console.error(`Claude (${report.aiModel}): ${issues} open issue(s) in ${calls} call(s), ${inputTokens} in / ${outputTokens} out tokens${cost}. Status: ${report.ai}.`);
+  }
   if (report.demoAging.applied) {
     const { aged } = report.demoAging;
     console.error(`Demo aging: simulated the waiting period for ${aged.length} seeded issue(s)${aged.length ? ` (${aged.join(', ')})` : ''}.`);
@@ -97,7 +104,6 @@ async function main() {
     return;
   }
   printReport(report);
-  console.log('\nRules only for now: Claude assessment arrives in phase 4, the HTML report in phase 5.');
 }
 
 main().catch((err) => {

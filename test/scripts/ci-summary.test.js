@@ -24,6 +24,16 @@ describe('renderSummary', () => {
     expect(md).toContain('**Stuck in In Review**: In Review for 6 business days');
   });
 
+  it("adds Claude's reason and next step, or says Claude was unavailable", () => {
+    expect(md).toContain('🤖 Late & waiting on <review>.<br>➡️ **Next:** Ask the reviewer for a date today.');
+    expect(md).toContain('_Claude unavailable: Claude declined to assess this batch_');
+  });
+
+  it('shows Claude status, model and cost', () => {
+    expect(md).toContain('Claude: partial (claude-sonnet-5-5, about $0.054)');
+    expect(renderSummary({ ...report, ai: 'off' })).toContain('Claude: off');
+  });
+
   it('collapses OK issues', () => {
     expect(md).toContain('<details><summary>1 issue(s) OK</summary>');
   });

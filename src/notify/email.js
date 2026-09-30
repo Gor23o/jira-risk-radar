@@ -38,6 +38,21 @@ const table = (headers, rows) =>
   rows.map((cells) => `<tr>${cells.map((c) => `<td style="${CELL}">${c}</td>`).join('')}</tr>`).join('') +
   `</table>`;
 
+function aiLine({ ai, aiModel, aiUsage }) {
+  if (ai === 'off') return 'Claude: off';
+  const cost = aiUsage?.costUsd == null ? '' : `, about $${aiUsage.costUsd.toFixed(3)}`;
+  return `Claude: ${ai} (${aiModel}${cost})`;
+}
+
+/** Claude's reason and next step for a flagged result, as [label, text] pairs. */
+function claudeNotes({ ai, level }) {
+  if (ai?.status === 'unavailable') return [['Claude unavailable', ai.reason]];
+  if (ai?.status !== 'ok' || level === 'ok') return [];
+  const notes = [['Claude', ai.reason]];
+  if (ai.suggested_action && ai.suggested_action !== 'None') notes.push(['Next step', ai.suggested_action]);
+  return notes;
+}
+
 function agingNote({ demoAging }) {
   if (!demoAging?.applied || !demoAging.aged.length) return null;
   return `Demo aging: the waiting period was simulated for ${demoAging.aged.length} seeded demo issue(s) (${demoAging.aged.join(', ')}). All other data is live from Jira.`;
@@ -87,13 +102,17 @@ export function buildEmail({ status, report, date, runUrl, failedStep }) {
     ...summary.byAssignee.map((p) => `  ${p.name}: ${p.critical} critical, ${p.at_risk} at risk, ${p.ok} ok`),
     '',
     flagged.length ? `Needs attention (${flagged.length}):` : 'Nothing at risk.',
-    ...flagged.flatMap(({ issue, level, flags }) => [
-      `- [${LEVEL_STYLE[level].label}] ${issue.key} ${issue.summary} (${issue.status.name}, ${issue.assignee?.name ?? 'Unassigned'})`,
-      ...flags.map((f) => `    ${f.message}: ${f.evidence}`),
-      `    ${issue.url}`,
-    ]),
+    ...flagged.flatMap((result) => {
+      const { issue, level, flags } = result;
+      return [
+        `- [${LEVEL_STYLE[level].label}] ${issue.key} ${issue.summary} (${issue.status.name}, ${issue.assignee?.name ?? 'Unassigned'})`,
+        ...flags.map((f) => `    ${f.message}: ${f.evidence}`),
+        ...claudeNotes(result).map(([label, text]) => `    ${label}: ${text}`),
+        `    ${issue.url}`,
+      ];
+    }),
     '',
-    `${summary.byLevel.ok} issue(s) OK. Full run: ${runUrl}`,
+    `${summary.byLevel.ok} issue(s) OK. ${aiLine(report)}. Full run: ${runUrl}`,
   ];
 
   // HTML part.
@@ -109,15 +128,20 @@ export function buildEmail({ status, report, date, runUrl, failedStep }) {
   );
   const issueTable = table(
     ['Level', 'Issue', 'Summary', 'Status', 'Assignee', 'Due', 'Why'],
-    flagged.map(({ issue, level, flags, escalated }) => [
+    flagged.map(({ issue, level, flags, escalated, ai }) => [
       `<strong style="color:${LEVEL_STYLE[level].color}">${LEVEL_STYLE[level].label}</strong>`,
       `<a href="${escapeHtml(issue.url)}">${escapeHtml(issue.key)}</a>`,
       escapeHtml(issue.summary),
       escapeHtml(issue.status.name),
       escapeHtml(issue.assignee?.name ?? 'Unassigned'),
       escapeHtml(issue.dueDate ?? '—'),
-      flags.map((f) => `<strong>${escapeHtml(f.message)}</strong>: ${escapeHtml(f.evidence)}`).join('<br>') +
-        (escalated ? '<br><em>Escalated: several distinct problems</em>' : ''),
+      [
+        ...flags.map((f) => `<strong>${escapeHtml(f.message)}</strong>: ${escapeHtml(f.evidence)}`),
+        ...(escalated ? ['<em>Escalated: several distinct problems</em>'] : []),
+        ...claudeNotes({ ai, level }).map(
+          ([label, text]) => `<span style="color:#59636e"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(text)}</span>`,
+        ),
+      ].join('<br>'),
     ]),
   );
 
@@ -128,7 +152,7 @@ export function buildEmail({ status, report, date, runUrl, failedStep }) {
       `<h3 style="margin:16px 0 0">By assignee</h3>${assigneeTable}` +
       `<h3 style="margin:16px 0 0">Needs attention (${flagged.length})</h3>` +
       (flagged.length ? issueTable : '<p>Nothing at risk.</p>') +
-      `<p style="color:#59636e;font-size:13px">${summary.byLevel.ok} issue(s) OK. JQL: <code>${escapeHtml(report.jql)}</code> · Claude: ${escapeHtml(report.ai)} · ` +
+      `<p style="color:#59636e;font-size:13px">${summary.byLevel.ok} issue(s) OK. JQL: <code>${escapeHtml(report.jql)}</code> · ${escapeHtml(aiLine(report))} · ` +
       `<a href="${escapeHtml(runUrl)}">Open this run on GitHub</a></p>`,
   );
 
