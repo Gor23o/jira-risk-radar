@@ -1,0 +1,91 @@
+{
+  "isLast": true,
+  "issues": [
+    {
+      "id": "10001",
+      "key": "RAD-1",
+      "fields": {
+        "summary": "Build Jira read layer",
+        "issuetype": { "name": "Task" },
+        "status": { "name": "In Progress", "statusCategory": { "key": "indeterminate", "name": "In Progress" } },
+        "priority": { "name": "High" },
+        "assignee": { "accountId": "acc-alex", "displayName": "Alex Doe" },
+        "duedate": "2026-10-02",
+        "created": "2026-09-28T09:15:00.000+0400",
+        "updated": "2026-09-29T18:00:00.000+0400",
+        "labels": ["backend"],
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                { "type": "text", "text": "Goal: ", "marks": [{ "type": "strong" }] },
+                { "type": "text", "text": "fetch issues via JQL." }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Pagination with nextPageToken" }] }] },
+                { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Full changelog" }] }] }
+              ]
+            }
+          ]
+        },
+        "comment": {
+          "startAt": 0,
+          "maxResults": 1,
+          "total": 1,
+          "comments": [
+            {
+              "author": { "displayName": "Sam Lee" },
+              "created": "2026-09-29T21:30:00.000+0000",
+              "body": { "type": "doc", "version": 1, "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Started on the client." }] }] }
+            }
+          ]
+        },
+        "customfield_10020": [
+          { "id": 3, "name": "RAD Sprint 2", "state": "active", "boardId": 1, "startDate": "2026-09-28T08:00:00.000Z", "endDate": "2026-10-09T17:00:00.000Z" },
+          { "id": 2, "name": "RAD Sprint 1", "state": "closed", "boardId": 1, "startDate": "2026-09-14T08:00:00.000Z", "endDate": "2026-09-25T17:00:00.000Z" }
+        ],
+        "customfield_10021": null
+      },
+      "changelog": {
+        "startAt": 0,
+        "maxResults": 1,
+        "total": 1,
+        "histories": [
+          {
+            "id": "501",
+            "created": "2026-09-28T10:00:00.000+0400",
+            "items": [
+              { "field": "status", "fieldId": "status", "from": "10000", "fromString": "To Do", "to": "3", "toString": "In Progress" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10004",
+      "key": "RAD-4",
+      "fields": {
+        "summary": "Demo prep",
+        "issuetype": { "name": "Task" },
+        "status": { "name": "To Do", "statusCategory": { "key": "new", "name": "To Do" } },
+        "priority": null,
+        "assignee": null,
+        "duedate": null,
+        "created": "2026-09-29T12:00:00.000+0400",
+        "updated": "2026-09-29T12:00:00.000+0400",
+        "labels": [],
+        "description": { "type": "doc", "version": 1, "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Get the demo ready." }] }] },
+        "comment": { "startAt": 0, "maxResults": 0, "total": 0, "comments": [] },
+        "customfield_10020": null,
+        "customfield_10021": [{ "self": "https://example.atlassian.net/rest/api/3/customFieldOption/10019", "value": "Impediment", "id": "10019" }]
+      },
+      "changelog": { "startAt": 0, "maxResults": 0, "total": 0, "histories": [] }
+    }
+  ]
+}
