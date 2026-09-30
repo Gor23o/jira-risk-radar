@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { buildEmail } from '../../src/notify/email.js';
+import { buildEmail, parseRecipients } from '../../src/notify/email.js';
+
+describe('parseRecipients', () => {
+  it('splits on commas or semicolons, trims, and drops duplicates and blanks', () => {
+    expect(parseRecipients(' a@x.com, b@y.org;a@x.com ,, ')).toEqual({ valid: ['a@x.com', 'b@y.org'], invalid: [] });
+  });
+
+  it('reports entries that are not email addresses', () => {
+    expect(parseRecipients('a@x.com, bob, c@nodot, d@e.io')).toEqual({ valid: ['a@x.com', 'd@e.io'], invalid: ['bob', 'c@nodot'] });
+  });
+
+  it('returns nothing for an empty or missing list', () => {
+    expect(parseRecipients('')).toEqual({ valid: [], invalid: [] });
+    expect(parseRecipients(undefined)).toEqual({ valid: [], invalid: [] });
+  });
+});
 
 const issue = (overrides = {}) => ({
   key: 'SCRUM-5',

@@ -60,6 +60,12 @@ on success, and on failure which step broke plus a link to the log. It's sent th
    - `GMAIL_APP_PASSWORD`: the app password
    - `EMAIL_TO`: recipients, comma-separated (kept as a secret so addresses stay out of this public repo)
 
+**Choosing recipients per run:** the Run workflow form has a **"Send email to"** field. Type one or
+more addresses (comma-separated) and that run emails them *instead of* `EMAIL_TO`. Leave it
+empty to use `EMAIL_TO`. Scheduled runs always use `EMAIL_TO`. Because this repo is public,
+typed addresses are masked as `***` in the run logs. A mistyped address fails the email step
+with a clear message rather than being skipped silently.
+
 If these secrets are missing, the run still passes and shows a yellow "Email not sent" warning.
 Preview an email locally without sending: `node scripts/send-email.js --issues issues.json --dry-run`.
 If `npm ci` itself fails, no email can be sent; GitHub's own failure notification covers that case.

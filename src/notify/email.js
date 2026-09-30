@@ -1,6 +1,20 @@
 // Builds the email sent after every GitHub Actions run. Pure: no network, no
 // clock. Phase 5 adds the risk summary (counts per level, critical issues).
 
+// Deliberately simple: catches typos like a missing "@", not every RFC edge case.
+const EMAIL = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+
+/**
+ * Splits "a@x.com, b@y.com" into addresses and reports anything that isn't one.
+ * @param {string|undefined} list - comma- or semicolon-separated
+ * @returns {{valid: string[], invalid: string[]}}
+ */
+export function parseRecipients(list) {
+  const parts = (list ?? '').split(/[,;]/).map((part) => part.trim()).filter(Boolean);
+  const unique = [...new Set(parts)];
+  return { valid: unique.filter((a) => EMAIL.test(a)), invalid: unique.filter((a) => !EMAIL.test(a)) };
+}
+
 const escapeHtml = (value) =>
   String(value ?? '')
     .replace(/&/g, '&amp;')

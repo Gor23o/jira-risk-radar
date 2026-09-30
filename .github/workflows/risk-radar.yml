@@ -15,6 +15,10 @@ on:
         description: "Evaluate as of this date, YYYY-MM-DD (leave empty for today)"
         required: false
         default: ""
+      email_to:
+        description: "Send the result email to (comma-separated; leave empty for the default recipients)"
+        required: false
+        default: ""
 
 # Read-only: this workflow never writes to the repo or to Jira.
 permissions:
@@ -36,6 +40,22 @@ jobs:
       # Runners use UTC; this makes "today" and all dates match the team's timezone.
       TZ: Asia/Yerevan
     steps:
+      # Public repo: logs are public. Typed email addresses are read straight from
+      # the event file (never via env, which GitHub prints) and masked as *** in
+      # every later log line before anything else runs.
+      - name: Hide email recipients
+        run: |
+          to=$(jq -r '.inputs.email_to // ""' "$GITHUB_EVENT_PATH")
+          IFS=',;' read -ra parts <<< "$to"
+          for address in "${parts[@]}"; do
+            address=$(echo "$address" | xargs)
+            if [ -n "$address" ]; then echo "::add-mask::$address"; fi
+          done
+          if [ -n "$(echo "$to" | xargs)" ]; then
+            echo "::add-mask::$to"
+            { echo "EMAIL_TO_OVERRIDE<<__END__"; echo "$to"; echo "__END__"; } >> "$GITHUB_ENV"
+          fi
+
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7

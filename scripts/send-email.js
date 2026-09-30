@@ -7,13 +7,14 @@
 //   add --dry-run to print the email instead of sending it
 //
 // Needs GMAIL_USER, GMAIL_APP_PASSWORD and EMAIL_TO (comma-separated) in the environment.
+// EMAIL_TO_OVERRIDE, set from the "Send email to" field of a manual run, replaces EMAIL_TO.
 
 import dotenv from 'dotenv';
 import { existsSync, readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import nodemailer from 'nodemailer';
 import { loadConfig } from '../src/config.js';
-import { buildEmail } from '../src/notify/email.js';
+import { buildEmail, parseRecipients } from '../src/notify/email.js';
 
 const { values: args } = parseArgs({
   options: {
@@ -58,7 +59,9 @@ if (args['dry-run']) {
   process.exit(0);
 }
 
-const { GMAIL_USER, GMAIL_APP_PASSWORD, EMAIL_TO } = process.env;
+const { GMAIL_USER, GMAIL_APP_PASSWORD } = process.env;
+const override = process.env.EMAIL_TO_OVERRIDE?.trim();
+const EMAIL_TO = override || process.env.EMAIL_TO;
 const missing = Object.entries({ GMAIL_USER, GMAIL_APP_PASSWORD, EMAIL_TO })
   .filter(([, value]) => !value?.trim())
   .map(([name]) => name);
@@ -69,7 +72,13 @@ if (missing.length) {
   process.exit(0);
 }
 
-const recipients = EMAIL_TO.split(',').map((address) => address.trim()).filter(Boolean);
+const { valid: recipients, invalid } = parseRecipients(EMAIL_TO);
+if (invalid.length || recipients.length === 0) {
+  // Someone typed these on purpose, so a typo should be loud, not silently skipped.
+  const source = override ? 'the "Send email to" field' : 'EMAIL_TO';
+  console.error(`Email not sent: ${source} has ${invalid.length} invalid address(es) and ${recipients.length} valid one(s). Use comma-separated addresses like a@x.com, b@y.com.`);
+  process.exit(1);
+}
 const transport = nodemailer.createTransport({
   service: 'gmail',
   auth: { user: GMAIL_USER.trim(), pass: GMAIL_APP_PASSWORD.replace(/\s+/g, '') },
