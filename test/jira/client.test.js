@@ -29,9 +29,9 @@ describe('readJiraEnv', () => {
     );
   });
 
-  it('points to .env locally and to repository secrets on GitHub Actions', () => {
+  it('points to .env locally and to the GitHub environment secrets on Actions', () => {
     expect(() => readJiraEnv({})).toThrow(/Copy \.env\.example to \.env/);
-    expect(() => readJiraEnv({ GITHUB_ACTIONS: 'true' })).toThrow(/repository secrets/);
+    expect(() => readJiraEnv({ GITHUB_ACTIONS: 'true' })).toThrow(/secrets of the GitHub environment/);
   });
 
   it('trims values and a trailing slash on the URL', () => {

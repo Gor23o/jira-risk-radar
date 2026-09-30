@@ -39,8 +39,13 @@ and on demand from **Actions → Risk Radar → Run workflow**, where you can op
 JQL or reference date. Each run shows a summary on the run page and keeps its output as a
 downloadable artifact for 14 days. Scheduled runs are report-only; they never write to Jira.
 
-One-time setup: in the GitHub repo, go to **Settings → Secrets and variables → Actions → New
-repository secret** and add `JIRA_BASE_URL`, `JIRA_EMAIL` and `JIRA_API_TOKEN` (same values as `.env`).
+One-time setup: the workflow reads its secrets from a GitHub **environment** named `.env`. In the
+repo, go to **Settings → Environments → New environment**, name it `.env`, and under
+**Environment secrets** add `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` and `ANTHROPIC_API_KEY`
+(same values as your local `.env` file). Use *secrets*, not *variables*: variables are stored
+in plain text. Keep "Deployment branches" on *No restriction* and add no required reviewers,
+otherwise scheduled runs will wait for approval. Each run appears as a "deployment" to `.env`
+on the repo page; that's expected.
 
 To change the schedule, edit the `cron` line: `"0 5 * * 1-5"` = weekdays only,
 `"0 5 * * 1,4"` = Monday and Thursday. Times are UTC. GitHub pauses scheduled workflows
