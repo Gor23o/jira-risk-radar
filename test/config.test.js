@@ -145,6 +145,10 @@ describe('parseConfig: invalid input', () => {
     expectInvalid(configWith((c) => (c.seed.refreshViaStatus = 'In Progress')), 'seed.refreshViaStatus', 'QA bounce');
   });
 
+  it('rejects a malformed seed project key', () => {
+    expectInvalid(configWith((c) => (c.seed.projectKey = 'scrum')), 'seed.projectKey');
+  });
+
   it('rejects "ok" as an --apply level', () => {
     expectInvalid(configWith((c) => (c.apply.levels = ['ok'])), 'apply.levels');
   });

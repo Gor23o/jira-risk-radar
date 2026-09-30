@@ -60,6 +60,15 @@ describe('createJiraClient', () => {
     expect(JSON.parse(fetch.requests[0].body)).toEqual({ jql: 'project = RAD' });
   });
 
+  it('supports PUT and DELETE, returning null for 204 No Content', async () => {
+    const fetch = fakeFetch(new Response(null, { status: 204 }), new Response(null, { status: 204 }));
+    const client = createJiraClient(settings, { fetch });
+    expect(await client.put('/rest/api/3/issue/SCRUM-1', { fields: { duedate: null } })).toBeNull();
+    expect(await client.delete('/rest/api/3/issue/SCRUM-1')).toBeNull();
+    expect(fetch.requests.map((r) => r.method)).toEqual(['PUT', 'DELETE']);
+    expect(JSON.parse(fetch.requests[0].body)).toEqual({ fields: { duedate: null } });
+  });
+
   it('retries a 429 after the Retry-After delay', async () => {
     noSleep.sleeps.length = 0;
     const fetch = fakeFetch(jsonResponse(429, {}, { 'Retry-After': '2' }), jsonResponse(200, { done: true }));
