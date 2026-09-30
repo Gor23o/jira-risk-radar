@@ -2,7 +2,7 @@
 // workflow after every run, successful or not.
 //
 // Usage:
-//   node scripts/send-email.js --status success --issues out/issues.json --run-url <url>
+//   node scripts/send-email.js --status success --report out/report.json --run-url <url>
 //   node scripts/send-email.js --status failure --failed-step "Run Risk Radar" --run-url <url>
 //   add --dry-run to print the email instead of sending it
 //
@@ -19,23 +19,22 @@ import { buildEmail, parseRecipients } from '../src/notify/email.js';
 const { values: args } = parseArgs({
   options: {
     status: { type: 'string', default: 'success' },
-    issues: { type: 'string' },
+    report: { type: 'string' },
     'run-url': { type: 'string', default: '' },
     'failed-step': { type: 'string' },
-    jql: { type: 'string' },
     'reference-date': { type: 'string' },
     'dry-run': { type: 'boolean', default: false },
   },
 });
 
 dotenv.config({ quiet: true });
-// Same JQL and date the run used, so the email describes what was actually searched.
+// Only needed for the date in a failure email's subject; a report carries its own date.
 const config = await loadConfig('config.json', {
-  overrides: { jql: args.jql || undefined, referenceDate: args['reference-date'] || undefined, noAi: true },
+  overrides: { referenceDate: args['reference-date'] || undefined, noAi: true },
 });
 
 /** Results only count on a successful run; a failed run can leave a half-written file behind. */
-function readIssues(path) {
+function readReport(path) {
   if (args.status !== 'success' || !path || !existsSync(path)) return null;
   try {
     return JSON.parse(readFileSync(path, 'utf8'));
@@ -44,12 +43,11 @@ function readIssues(path) {
   }
 }
 
-const issues = readIssues(args.issues);
+const report = readReport(args.report);
 const email = buildEmail({
   status: args.status,
-  issues,
+  report,
   date: config.referenceDate,
-  jql: config.jql,
   runUrl: args['run-url'],
   failedStep: args['failed-step'],
 });

@@ -85,8 +85,8 @@ jobs:
           args=()
           if [ -n "$INPUT_JQL" ]; then args+=(--jql "$INPUT_JQL"); fi
           if [ -n "$INPUT_REFERENCE_DATE" ]; then args+=(--reference-date "$INPUT_REFERENCE_DATE"); fi
-          npm run -s radar -- --dump "${args[@]}" > out/issues.json
-          node scripts/ci-summary.js out/issues.json >> "$GITHUB_STEP_SUMMARY"
+          npm run -s radar -- --json "${args[@]}" > out/report.json
+          node scripts/ci-summary.js out/report.json >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -107,13 +107,11 @@ jobs:
           JOB_STATUS: ${{ job.status }}
           FAILED_STEP: ${{ steps.tests.outcome == 'failure' && 'Run tests' || steps.radar.outcome == 'failure' && 'Run Risk Radar' || '' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          INPUT_JQL: ${{ inputs.jql }}
           INPUT_REFERENCE_DATE: ${{ inputs.reference_date }}
         run: >
           node scripts/send-email.js
           --status "$JOB_STATUS"
-          --issues out/issues.json
+          --report out/report.json
           --run-url "$RUN_URL"
           --failed-step "$FAILED_STEP"
-          --jql "$INPUT_JQL"
           --reference-date "$INPUT_REFERENCE_DATE"

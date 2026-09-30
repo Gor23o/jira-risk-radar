@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildEmail, parseRecipients } from '../../src/notify/email.js';
+import { report } from '../fixtures/report.js';
 
 describe('parseRecipients', () => {
   it('splits on commas or semicolons, trims, and drops duplicates and blanks', () => {
@@ -16,62 +17,56 @@ describe('parseRecipients', () => {
   });
 });
 
-const issue = (overrides = {}) => ({
-  key: 'SCRUM-5',
-  url: 'https://example.atlassian.net/browse/SCRUM-5',
-  summary: 'Build Jira read layer',
-  status: { name: 'In Progress' },
-  assignee: { name: 'Alex Doe' },
-  dueDate: '2026-10-02',
-  sprint: { name: 'SCRUM Sprint 0' },
-  flagged: false,
-  ...overrides,
-});
-
-const base = {
-  status: 'success',
-  date: '2026-10-01',
-  jql: 'project = SCRUM AND statusCategory != Done',
-  runUrl: 'https://github.com/o/r/actions/runs/1',
-};
+const runUrl = 'https://github.com/o/r/actions/runs/1';
 
 describe('buildEmail: successful run', () => {
-  it('puts the date and issue count in the subject', () => {
-    expect(buildEmail({ ...base, issues: [issue(), issue({ key: 'SCRUM-6' })] }).subject).toBe('Risk Radar 2026-10-01: 2 issues');
-    expect(buildEmail({ ...base, issues: [issue()] }).subject).toBe('Risk Radar 2026-10-01: 1 issue');
+  const email = buildEmail({ status: 'success', report, date: '2026-10-01', runUrl });
+
+  it('puts the risk counts in the subject', () => {
+    expect(email.subject).toBe('Risk Radar 2026-10-01: 1 critical, 1 at risk, 1 ok');
   });
 
-  it('lists every issue with a link in both the HTML and plain-text parts', () => {
-    const { html, text } = buildEmail({ ...base, issues: [issue(), issue({ key: 'SCRUM-8', assignee: null, flagged: true })] });
-    expect(html).toContain('<a href="https://example.atlassian.net/browse/SCRUM-5">SCRUM-5</a>');
-    expect(html).toContain('Unassigned');
-    expect(text).toContain('SCRUM-8  Build Jira read layer  [In Progress]  Unassigned  due 2026-10-02  FLAGGED');
-    expect(text).toContain(base.runUrl);
+  it('lists issues needing attention with their evidence, in both parts', () => {
+    expect(email.text).toContain('- [Critical] SCRUM-20 Refactor <payment> | errors (In Review, Alex Doe)');
+    expect(email.text).toContain('    Stuck in In Review: In Review for 6 business days');
+    expect(email.html).toContain('<a href="https://example.atlassian.net/browse/SCRUM-39">SCRUM-39</a>');
+    expect(email.html).toContain('<strong>High priority with no owner</strong>: Highest priority, unassigned');
+  });
+
+  it('includes the per-assignee counts', () => {
+    expect(email.text).toContain('Unassigned: 0 critical, 1 at risk, 0 ok');
+    expect(email.html).toContain('>Unassigned</td>');
+  });
+
+  it('states that demo aging was simulated', () => {
+    expect(email.text).toContain('Demo aging: the waiting period was simulated for 1 seeded demo issue(s) (SCRUM-20)');
+    expect(email.html).toContain('Demo aging');
+    const noAging = buildEmail({ status: 'success', report: { ...report, demoAging: { applied: false, aged: [] } }, runUrl });
+    expect(noAging.text).not.toContain('Demo aging');
   });
 
   it('escapes HTML in ticket text so a summary cannot inject markup', () => {
-    const { html } = buildEmail({ ...base, issues: [issue({ summary: '<script>alert(1)</script> & co' })] });
-    expect(html).not.toContain('<script>');
-    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt; &amp; co');
+    expect(email.html).not.toContain('<payment>');
+    expect(email.html).toContain('Refactor &lt;payment&gt; | errors');
   });
 
-  it('explains an empty result instead of sending an empty table', () => {
-    const { subject, html } = buildEmail({ ...base, issues: [] });
-    expect(subject).toBe('Risk Radar 2026-10-01: 0 issues');
+  it('explains an empty result', () => {
+    const empty = { ...report, summary: { total: 0, byLevel: { critical: 0, at_risk: 0, ok: 0 }, byAssignee: [] }, results: [] };
+    const { subject, html } = buildEmail({ status: 'success', report: empty, runUrl });
+    expect(subject).toBe('Risk Radar 2026-10-01: no issues');
     expect(html).toContain('No issues matched the JQL');
-    expect(html).not.toContain('<table');
   });
 });
 
 describe('buildEmail: failed run', () => {
   it('says which step failed and links to the run', () => {
-    const { subject, text, html } = buildEmail({ ...base, status: 'failure', issues: null, failedStep: 'Run Risk Radar' });
+    const { subject, text, html } = buildEmail({ status: 'failure', report: null, date: '2026-10-01', runUrl, failedStep: 'Run Risk Radar' });
     expect(subject).toBe('Risk Radar 2026-10-01: run FAILED');
     expect(text).toContain('The "Run Risk Radar" step failed.');
-    expect(html).toContain(`<a href="${base.runUrl}">`);
+    expect(html).toContain(`<a href="${runUrl}">`);
   });
 
-  it('treats a success without results as a failure', () => {
-    expect(buildEmail({ ...base, issues: null }).subject).toBe('Risk Radar 2026-10-01: run FAILED');
+  it('treats a success without a report as a failure', () => {
+    expect(buildEmail({ status: 'success', report: null, date: '2026-10-01', runUrl }).subject).toBe('Risk Radar 2026-10-01: run FAILED');
   });
 });

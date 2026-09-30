@@ -6,6 +6,7 @@
 //   npm run seed -- --verify          check the live seeded issues against their scenarios (read-only)
 //   add --dry-run to seed/refresh/reset to see the plan without writing to Jira
 //   add --demo-aging to --verify to check "stuck" scenarios without waiting (see src/seed/aging.js)
+//   add --reference-date YYYY-MM-DD to --verify to preview what a later day's run will say
 //
 // See CLAUDE.md → "Seed design" for why seeding and refreshing are separate steps.
 
@@ -28,6 +29,7 @@ const { values: args } = parseArgs({
     reset: { type: 'boolean', default: false },
     verify: { type: 'boolean', default: false },
     'demo-aging': { type: 'boolean', default: false },
+    'reference-date': { type: 'string' },
     'dry-run': { type: 'boolean', default: false },
     yes: { type: 'boolean', default: false },
   },
@@ -37,8 +39,13 @@ if ([args.refresh, args.reset, args.verify].filter(Boolean).length > 1) {
   process.exit(2);
 }
 
+if (args['reference-date'] && !args.verify) {
+  console.error('--reference-date only works with --verify (to preview another day). Seeding always uses today.');
+  process.exit(2);
+}
+
 dotenv.config({ quiet: true });
-const config = await loadConfig('config.json', { overrides: { noAi: true } });
+const config = await loadConfig('config.json', { overrides: { noAi: true, referenceDate: args['reference-date'] } });
 const client = createJiraClient(readJiraEnv());
 const dryRun = args['dry-run'];
 const today = config.referenceDate;
@@ -142,7 +149,7 @@ async function verify() {
 
   const passed = scenarios.length - failures;
   console.log(`\n${passed}/${scenarios.length} scenarios match.`);
-  if (dueDrift) console.log(`Note: ${dueDrift} due date(s) were anchored to another day. Run \`npm run seed -- --refresh\` to re-anchor them to today.`);
+  if (dueDrift && failures) console.log(`Note: ${dueDrift} due date(s) were anchored to another day. Run \`npm run seed -- --refresh\` to re-anchor them to today.`);
   if (unaged && !args['demo-aging']) console.log(`Note: ${unaged} "stuck" scenario(s) haven't aged yet. Add --demo-aging to simulate the wait.`);
   if (failures) process.exitCode = 1;
 }

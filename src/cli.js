@@ -3,10 +3,10 @@
 import dotenv from 'dotenv';
 import { parseArgs } from 'node:util';
 import { ConfigError, loadConfig } from './config.js';
-import { fetchIssues } from './jira/index.js';
 import { JiraError } from './jira/client.js';
-import { runRules } from './rules/index.js';
-import { applyDemoAging } from './seed/aging.js';
+import { fetchIssues } from './jira/index.js';
+import { runRadar } from './pipeline.js';
+import { levelCountsText } from './report/summarize.js';
 
 const HELP = `Usage: npm run radar -- [options]
 
@@ -16,7 +16,8 @@ Options:
   --reference-date <date>  Evaluate "as of" this date, YYYY-MM-DD (default: today)
   --no-ai                  Rules only; skip the Claude assessment
   --demo-aging             Simulate the waiting period for seeded "stuck" demo issues
-                           (seed-demo label only; see README → Demo runbook)
+                           (always on while config seed.demoAging is true)
+  --json                   Print the full report as JSON (used by the GitHub workflow)
   --dump                   Print the normalized issues as JSON and stop
   -h, --help               Show this help`;
 
@@ -29,6 +30,7 @@ function parseCliArgs(argv) {
       'reference-date': { type: 'string' },
       'no-ai': { type: 'boolean', default: false },
       'demo-aging': { type: 'boolean', default: false },
+      json: { type: 'boolean', default: false },
       dump: { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
     },
@@ -36,20 +38,21 @@ function parseCliArgs(argv) {
   return values;
 }
 
-const LEVEL_ORDER = { critical: 2, at_risk: 1, ok: 0 };
+const LEVEL_LABEL = { critical: 'CRITICAL', at_risk: 'AT RISK', ok: 'ok' };
 
-/** Plain-text table of rule flags; the HTML report replaces this in phase 5. */
-function printRulesTable(results) {
-  const worst = (flags) => Math.max(-1, ...flags.map((f) => LEVEL_ORDER[f.severity]));
-  const sortedResults = [...results].sort((a, b) => worst(b.flags) - worst(a.flags) || b.flags.length - a.flags.length);
-  for (const { issue, flags } of sortedResults) {
+/** Plain-text report; the HTML report replaces this in phase 5. */
+function printReport(report) {
+  console.log(`\nRisk Radar as of ${report.referenceDate} (${report.timezone}): ${levelCountsText(report.summary)}\n`);
+  for (const { issue, level, flags, escalated } of report.results) {
     const summary = issue.summary.length > 44 ? `${issue.summary.slice(0, 43)}…` : issue.summary;
-    const labels = flags.length ? flags.map((f) => `${f.rule} (${f.severity})`).join(', ') : '—';
-    console.log(`${issue.key.padEnd(9)} ${issue.status.name.padEnd(13)} ${summary.padEnd(45)} ${labels}`);
-    for (const f of flags) console.log(`${' '.repeat(24)}↳ ${f.evidence}`);
+    const why = flags.length ? flags.map((f) => f.rule).join(', ') + (escalated ? ' → escalated' : '') : '';
+    console.log(`${LEVEL_LABEL[level].padEnd(9)} ${issue.key.padEnd(9)} ${issue.status.name.padEnd(13)} ${summary.padEnd(45)} ${why}`);
+    for (const f of flags) console.log(`${' '.repeat(33)}↳ ${f.evidence}`);
   }
-  const flagged = results.filter((r) => r.flags.length).length;
-  console.log(`\n${flagged} of ${results.length} issue(s) have rule flags.`);
+  console.log('\nBy assignee:');
+  for (const p of report.summary.byAssignee) {
+    console.log(`  ${p.name.padEnd(20)} ${p.critical} critical, ${p.at_risk} at risk, ${p.ok} ok`);
+  }
 }
 
 async function main() {
@@ -71,27 +74,30 @@ async function main() {
     overrides: { referenceDate: args['reference-date'], jql: args.jql, noAi: args['no-ai'] },
   });
 
-  // Progress and warnings go to stderr so `--dump > issues.json` stays clean JSON.
+  // Progress and warnings go to stderr so --json / --dump output stays clean.
   console.error(`Searching Jira: ${config.jql}`);
-  let { issues, warnings } = await fetchIssues(config);
-  for (const warning of warnings) console.error(`Warning: ${warning}`);
-  console.error(`Found ${issues.length} issue(s).`);
-
-  if (args['demo-aging']) {
-    const { scenarios } = await import('../scripts/seed-data.js');
-    const result = applyDemoAging(issues, { scenarios, config });
-    issues = result.issues;
-    console.error(`Demo aging: simulated the waiting period for ${result.aged.length} seeded issue(s)${result.aged.length ? ` (${result.aged.join(', ')})` : ''}.`);
-  }
 
   if (args.dump) {
+    const { issues, warnings } = await fetchIssues(config);
+    for (const warning of warnings) console.error(`Warning: ${warning}`);
     console.log(JSON.stringify(issues, null, 2));
     return;
   }
 
-  console.log(`\nRisk flags as of ${config.referenceDate} (${config.timezone}), rules only:\n`);
-  printRulesTable(issues.map((issue) => ({ issue, flags: runRules(issue, config) })));
-  console.log('Claude assessment arrives in phase 4, the combined report in phase 5.');
+  const report = await runRadar(config, { demoAging: args['demo-aging'] || config.seed.demoAging });
+  for (const warning of report.warnings) console.error(`Warning: ${warning}`);
+  console.error(`Found ${report.summary.total} issue(s).`);
+  if (report.demoAging.applied) {
+    const { aged } = report.demoAging;
+    console.error(`Demo aging: simulated the waiting period for ${aged.length} seeded issue(s)${aged.length ? ` (${aged.join(', ')})` : ''}.`);
+  }
+
+  if (args.json) {
+    console.log(JSON.stringify(report, null, 2));
+    return;
+  }
+  printReport(report);
+  console.log('\nRules only for now: Claude assessment arrives in phase 4, the HTML report in phase 5.');
 }
 
 main().catch((err) => {
