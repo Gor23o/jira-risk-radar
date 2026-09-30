@@ -34,6 +34,7 @@ export function findUnknownStatusNames(config, jiraStatuses) {
     ...config.blockedStatuses,
     ...config.bounce.fromStatuses,
     ...config.bounce.toStatuses,
+    ...Object.keys(config.statusCategoryOverrides),
     config.seed.refreshViaStatus,
   ]);
   return [...configured].filter((name) => !known.has(name.toLowerCase()));

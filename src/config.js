@@ -56,6 +56,8 @@ const configSchema = z
       minCount: positiveInt,
     }),
     highPriorities: textList,
+    // Corrects boards whose statuses sit in the wrong Jira category (e.g. "In QA" filed under To Do).
+    statusCategoryOverrides: z.record(text, z.enum(['new', 'indeterminate', 'done'])),
     severity: z.strictObject({
       rules: z.strictObject(Object.fromEntries(FLAG_NAMES.map((name) => [name, level]))),
       flagGroups: z.record(text, z.array(flagName).min(1)),

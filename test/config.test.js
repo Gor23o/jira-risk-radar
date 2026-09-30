@@ -145,6 +145,10 @@ describe('parseConfig: invalid input', () => {
     expectInvalid(configWith((c) => (c.seed.refreshViaStatus = 'In Progress')), 'seed.refreshViaStatus', 'QA bounce');
   });
 
+  it('rejects an unknown status category in the overrides', () => {
+    expectInvalid(configWith((c) => (c.statusCategoryOverrides['In QA'] = 'in_progress')), 'statusCategoryOverrides');
+  });
+
   it('rejects a malformed seed project key', () => {
     expectInvalid(configWith((c) => (c.seed.projectKey = 'scrum')), 'seed.projectKey');
   });

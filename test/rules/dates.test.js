@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { addBusinessDays, addDays, dateInTimezone, isIsoDate, isoWeekday, isValidTimezone } from '../../src/rules/dates.js';
+import {
+  addBusinessDays,
+  addDays,
+  businessDaysBetween,
+  dateInTimezone,
+  daysBetween,
+  isIsoDate,
+  isoWeekday,
+  isValidTimezone,
+} from '../../src/rules/dates.js';
 
 const MON_FRI = [1, 2, 3, 4, 5];
 
@@ -12,6 +21,37 @@ describe('isoWeekday / addDays', () => {
   it('crosses month and year boundaries', () => {
     expect(addDays('2026-09-30', 1)).toBe('2026-10-01');
     expect(addDays('2027-01-01', -1)).toBe('2026-12-31');
+  });
+});
+
+describe('businessDaysBetween', () => {
+  it('is 0 for the same day, in either direction, and within a weekend', () => {
+    expect(businessDaysBetween('2026-10-01', '2026-10-01', MON_FRI)).toBe(0);
+    expect(businessDaysBetween('2026-10-05', '2026-10-01', MON_FRI)).toBe(0);
+    expect(businessDaysBetween('2026-10-03', '2026-10-04', MON_FRI)).toBe(0); // Sat -> Sun
+  });
+
+  it('skips weekend spans', () => {
+    expect(businessDaysBetween('2026-10-02', '2026-10-05', MON_FRI)).toBe(1); // Fri -> Mon
+    expect(businessDaysBetween('2026-09-30', '2026-10-08', MON_FRI)).toBe(6); // Wed -> next Thu
+  });
+
+  it('counts from a Saturday start and to a Sunday end', () => {
+    expect(businessDaysBetween('2026-10-03', '2026-10-06', MON_FRI)).toBe(2); // Sat -> Tue: Mon, Tue
+    expect(businessDaysBetween('2026-10-01', '2026-10-04', MON_FRI)).toBe(1); // Thu -> Sun: Fri
+  });
+
+  it('is the inverse of addBusinessDays', () => {
+    for (const n of [1, 3, 6, 11]) {
+      expect(businessDaysBetween('2026-09-30', addBusinessDays('2026-09-30', n, MON_FRI), MON_FRI)).toBe(n);
+    }
+  });
+});
+
+describe('daysBetween', () => {
+  it('counts calendar days, negative when going back', () => {
+    expect(daysBetween('2026-09-28', '2026-09-30')).toBe(2);
+    expect(daysBetween('2026-09-30', '2026-09-28')).toBe(-2);
   });
 });
 

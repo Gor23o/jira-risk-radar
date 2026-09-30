@@ -53,6 +53,23 @@ export function addBusinessDays(date, days, workingDays) {
   return result;
 }
 
+/**
+ * Working days after `start` up to and including `end`; 0 if `end` isn't after `start`.
+ * Mon→Tue = 1, Fri→Mon = 1, Sat→Sun = 0.
+ */
+export function businessDaysBetween(start, end, workingDays) {
+  let count = 0;
+  for (let day = addDays(start, 1); day <= end; day = addDays(day, 1)) {
+    if (workingDays.includes(isoWeekday(day))) count++;
+  }
+  return count;
+}
+
+/** Calendar days from `start` to `end` (negative if `end` is earlier). */
+export function daysBetween(start, end) {
+  return Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000);
+}
+
 /** The calendar date (YYYY-MM-DD) that `instant` falls on in `timeZone`. */
 export function dateInTimezone(instant, timeZone) {
   const parts = new Intl.DateTimeFormat('en-US', {

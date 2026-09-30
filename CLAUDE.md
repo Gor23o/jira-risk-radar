@@ -49,6 +49,8 @@ npm run seed -- --dry-run                  # preview the seed plan (read-only)
 npm run seed                               # create demo issues in SCRUM (ask first!)
 npm run seed -- --refresh                  # demo day: restart healthy issues' clocks (ask first!)
 npm run seed -- --reset                    # delete seed-demo issues (ask first!)
+npm run seed -- --verify --demo-aging      # check seeded issues against their scenarios now (read-only)
+npm run radar -- --no-ai --demo-aging      # rules table with the seed waiting period simulated
 ```
 
 ## Architecture
@@ -86,6 +88,7 @@ Pipeline: **fetch → normalize → rules → Claude → merge → report → (a
   "blockedStatuses": ["Blocked"],
   "bounce": { "fromStatuses": ["In QA", "Ready for QA"], "toStatuses": ["In Progress"], "minCount": 2 },
   "highPriorities": ["Highest", "High"],
+  "statusCategoryOverrides": { "In QA": "indeterminate", "Blocked": "indeterminate" },
   "severity": {
     "rules": { "overdue": "critical", "dueSoonNotStarted": "at_risk", "stuck": "at_risk",
                "blocked": "at_risk", "blockedInComments": "at_risk", "bouncing": "at_risk",
@@ -160,7 +163,12 @@ Combination, in `src/merge/merge.js`. Rule flags and Claude-sourced flags are tr
 - `overdue` is a plain date comparison (due date < referenceDate), because a missed date is
   missed on any day. Holidays are not modelled (documented limitation).
 - **Time in status** is measured from the last changelog transition into the current
-  status, or from the created date if there isn't one.
+  status, or from the created date if there isn't one. `stuck` applies to statuses whose
+  (effective) category is `indeterminate` and fires when business days are **strictly greater**
+  than the status threshold. To Do isn't checked, because the backlog is normal.
+- **`statusCategoryOverrides`** corrects statuses that the board files under the wrong Jira category.
+  The SCRUM board reports In QA and Blocked as `new`, so config maps both to `indeterminate`.
+  Rules read categories only through `effectiveCategory()` in `src/rules/statusHistory.js`.
 - **Bouncing** = the number of changelog transitions directly from a `bounce.fromStatuses`
   status to a `bounce.toStatuses` status, ≥ `bounce.minCount`.
 - Every flag has the shape `{ rule, source, severity, message, evidence }`. `evidence` is
@@ -223,7 +231,7 @@ One commit per phase. Stop after each phase for the user to verify.
 | 0 | Scaffold | `git init`, package.json, .gitignore, .env.example, `config.json`, `src/config.js` (zod validation, referenceDate/timezone resolution), Vitest, README skeleton | `npm test` passes the config-validation tests |
 | 1 | Jira read | `jira/client.js`, `jira/search.js`, `jira/fields.js`, `jira/normalize.js`, `adf/toText.js`, `--dump` | SCRUM issues print as normalized JSON; ADF + normalize tests pass on fixtures |
 | 2 | Seed demo data | `scripts/seed-data.js` (~30 scenarios), `scripts/seed.js` (`seed`, `--refresh`, `--reset`), demo runbook in README | Board shows the issues; refresh and reset behave as described in "Seed design" |
-| 3 | Rule engine | `rules/dates.js`, `rules/statusHistory.js`, six rules, `rules/index.js`, rules-only table in the CLI | Rule tests green (including the refresh-is-not-a-bounce case); seeded issues flagged as expected |
+| 3 | Rule engine | `rules/dates.js`, `rules/statusHistory.js`, six rules, `rules/index.js`, rules-only table in the CLI, `seed/aging.js` + `seed --verify` for instant checks | Rule tests green (including the refresh-is-not-a-bounce case); scenario acceptance test passes on demo day and with aging; `seed --verify --demo-aging` 33/33 live |
 | 4 | Claude assessment | Verify SDK on docs.claude.com, then `ai/schema.js`, `ai/prompt.js`, `ai/assess.js` | Fixture tests for parsing + unavailable handling; one real run with the user's OK |
 | 5 | Merge + report | `merge/merge.js`, `report/summarize.js`, `report/html.js` | Merge + summarize tests green; the HTML report opens and reads well |
 | 6 | `--apply` | `jira/apply.js` with `--dry-run`; label + comment for `apply.levels`, skip already-labelled issues | Dry run lists the right issues; the real run writes them; a second run changes nothing |
@@ -251,12 +259,22 @@ healthy-vs-stuck contrast inside a column.
   dates to today + offset. Stuck candidates are left alone.
 - `npm run seed -- --reset`: deletes exactly `project = SCRUM AND labels = seed-demo`, after
   printing the keys and asking for typed confirmation.
-- **Short-notice fallback** (seeded the same day): run with `--reference-date` = seed date +
-  3 business days. Waiting statuses and In QA trip, In Progress doesn't. The contrast is between
-  columns only. `seed.js` prints this date when it finishes.
+- **Check right away: `--demo-aging`** (user requirement: results must be checkable the moment
+  issues are seeded, not after a week). Only `stuck` depends on elapsed time; every other flag is
+  live Jira data from the start. `src/seed/aging.js` simulates the wait by moving back the
+  "entered current status" date, and **only** for issues that have the seed label AND match a
+  scenario with `refresh: false`. It never makes an issue younger, marks aged history entries
+  `simulated: true`, and every command using it prints how many issues were aged. Never apply
+  it to anything else. It replaces the old "future `--reference-date`" fallback, which shifted
+  due-date meanings.
+- `npm run seed -- --verify [--demo-aging]` (read-only) runs the rules on the live seeded issues
+  and prints ✓/✗ per scenario against `expect`, with hints for un-aged stuck scenarios and due
+  dates anchored to another day (fix: `--refresh`).
 
 **Demo runbook** (in the README):
-1. ≥6 business days before the demo: `npm run seed -- --reset` if re-seeding, then `npm run seed`.
-2. Demo day: `npm run seed -- --refresh`, then `npm run radar`, and open the report.
-3. Optionally: `npm run radar -- --apply --dry-run` to show what would be written to Jira.
-4. Short notice: `npm run seed`, then `npm run radar -- --reference-date <date printed by seed>`.
+1. Any time: `npm run seed` (after `--reset` if re-seeding), then
+   `npm run seed -- --verify --demo-aging` and `npm run radar -- --demo-aging`.
+2. On a later day: `npm run seed -- --refresh` first (re-anchors due dates), then the same.
+3. Fully real demo (no simulation): seed ≥6 business days ahead, `--refresh` on demo day, and
+   run without `--demo-aging`.
+4. Optionally: `npm run radar -- --apply --dry-run` to show what would be written to Jira.
