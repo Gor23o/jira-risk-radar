@@ -18,6 +18,7 @@
     "minCount": 2
   },
   "highPriorities": ["Highest", "High"],
+  "statusCategoryOverrides": { "In QA": "indeterminate", "Blocked": "indeterminate" },
   "severity": {
     "rules": {
       "overdue": "critical",

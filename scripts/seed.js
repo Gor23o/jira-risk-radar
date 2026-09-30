@@ -3,7 +3,9 @@
 //   npm run seed                      create ~30 issues (refuses if seed issues exist)
 //   npm run seed -- --refresh         demo day: restart healthy clocks, re-anchor due dates
 //   npm run seed -- --reset           delete every issue with the seed label (asks first)
-//   add --dry-run to any of them to see the plan without writing to Jira
+//   npm run seed -- --verify          check the live seeded issues against their scenarios (read-only)
+//   add --dry-run to seed/refresh/reset to see the plan without writing to Jira
+//   add --demo-aging to --verify to check "stuck" scenarios without waiting (see src/seed/aging.js)
 //
 // See CLAUDE.md → "Seed design" for why seeding and refreshing are separate steps.
 
@@ -12,7 +14,10 @@ import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { loadConfig } from '../src/config.js';
 import { createJiraClient, readJiraEnv } from '../src/jira/client.js';
+import { fetchIssues } from '../src/jira/index.js';
 import { addBusinessDays } from '../src/rules/dates.js';
+import { runRules } from '../src/rules/index.js';
+import { applyDemoAging } from '../src/seed/aging.js';
 import { describeScenario, findSeedIssues, preflight, transitionTo } from '../src/seed/jira.js';
 import { createFields, dueDateFor, refreshTransitions, resolveAssignee, toAdf } from '../src/seed/plan.js';
 import { scenarios } from './seed-data.js';
@@ -21,12 +26,14 @@ const { values: args } = parseArgs({
   options: {
     refresh: { type: 'boolean', default: false },
     reset: { type: 'boolean', default: false },
+    verify: { type: 'boolean', default: false },
+    'demo-aging': { type: 'boolean', default: false },
     'dry-run': { type: 'boolean', default: false },
     yes: { type: 'boolean', default: false },
   },
 });
-if (args.refresh && args.reset) {
-  console.error('Choose one: --refresh or --reset.');
+if ([args.refresh, args.reset, args.verify].filter(Boolean).length > 1) {
+  console.error('Choose one: --refresh, --reset or --verify.');
   process.exit(2);
 }
 
@@ -94,9 +101,50 @@ async function seed() {
 
   const longestThreshold = Math.max(...Object.values(config.stuckThresholdBusinessDays));
   console.log(`\n${tag}Done. Seeded on ${today}.`);
-  console.log(`  Earliest demo day (clean stuck contrast): ${addBusinessDays(today, longestThreshold + 1, workingDays)}`);
-  console.log(`  On demo day run: npm run seed -- --refresh, then npm run radar`);
-  console.log(`  Short-notice fallback: npm run radar -- --reference-date ${addBusinessDays(today, 3, workingDays)}`);
+  console.log(`  Check right away:  npm run seed -- --verify --demo-aging`);
+  console.log(`  Real aging done:   ${addBusinessDays(today, longestThreshold + 1, workingDays)} (then --refresh, and no simulation needed)`);
+}
+
+async function verify() {
+  const jql = `project = ${config.seed.projectKey} AND labels = "${label}" ORDER BY key ASC`;
+  let { issues } = await fetchIssues({ ...config, jql });
+  if (!issues.length) throw new Error(`No issues labelled "${label}" found. Run \`npm run seed\` first.`);
+
+  let aged = [];
+  if (args['demo-aging']) ({ issues, aged } = applyDemoAging(issues, { scenarios, config }));
+  const bySummary = new Map(issues.map((i) => [i.summary, i]));
+  const sorted = (list) => [...list].sort().join(', ') || '—';
+
+  console.log(`Verifying ${scenarios.length} scenarios against live Jira as of ${today}` +
+    (args['demo-aging'] ? `, demo aging simulated for ${aged.length} issue(s)` : '') + '\n');
+
+  let failures = 0;
+  let dueDrift = 0;
+  let unaged = 0;
+  for (const scenario of scenarios) {
+    const issue = bySummary.get(scenario.summary);
+    if (!issue) {
+      failures++;
+      console.log(`✗ ${'(missing)'.padEnd(9)} ${scenario.summary}: not found in Jira`);
+      continue;
+    }
+    const flags = runRules(issue, config);
+    const expected = sorted(scenario.expect);
+    const actual = sorted(flags.map((f) => f.rule));
+    const ok = expected === actual;
+    if (!ok) failures++;
+    if (issue.dueDate !== dueDateFor(scenario, today, workingDays)) dueDrift++;
+    if (!ok && scenario.expect.includes('stuck') && !actual.includes('stuck')) unaged++;
+
+    const ai = scenario.expectAi.length ? `   (Claude, phase 4: ${scenario.expectAi.join(', ')})` : '';
+    console.log(`${ok ? '✓' : '✗'} ${issue.key.padEnd(9)} ${scenario.summary.padEnd(46)} ${actual}${ok ? '' : `   expected: ${expected}`}${ai}`);
+  }
+
+  const passed = scenarios.length - failures;
+  console.log(`\n${passed}/${scenarios.length} scenarios match.`);
+  if (dueDrift) console.log(`Note: ${dueDrift} due date(s) were anchored to another day. Run \`npm run seed -- --refresh\` to re-anchor them to today.`);
+  if (unaged && !args['demo-aging']) console.log(`Note: ${unaged} "stuck" scenario(s) haven't aged yet. Add --demo-aging to simulate the wait.`);
+  if (failures) process.exitCode = 1;
 }
 
 async function refresh() {
@@ -161,7 +209,7 @@ async function reset() {
 }
 
 try {
-  await (args.reset ? reset() : args.refresh ? refresh() : seed());
+  await (args.verify ? verify() : args.reset ? reset() : args.refresh ? refresh() : seed());
 } catch (err) {
   console.error(err.message);
   process.exit(1);

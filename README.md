@@ -80,27 +80,33 @@ The demo backlog is 33 issues for a fictional "Checkout v2" project, defined in
 [`scripts/seed-data.js`](scripts/seed-data.js). Each one covers a risk scenario and says what the
 radar should find. All seeded issues carry the `seed-demo` label; nothing else is ever touched.
 
-**Why two steps?** Jira can't backdate, so every seeded issue enters its status on seed day.
-Seeding early and then "refreshing" the healthy issues on demo day gives a real contrast: stuck
-issues have sat for a week while healthy ones restarted their clock today.
+### Check the demo right away
+```bash
+npm run seed -- --dry-run                 # preview; writes nothing
+npm run seed                              # create the 33 issues
+npm run seed -- --verify --demo-aging     # ✓/✗ per scenario: does the radar find what it should?
+npm run radar -- --no-ai --demo-aging     # the risk table for the whole project
+```
+On a later day, run `npm run seed -- --refresh` first so due dates are relative to today again.
 
-1. **At least 6 business days before the demo** (the longest stuck threshold + 1):
-   ```bash
-   npm run seed -- --dry-run   # preview; writes nothing
-   npm run seed                # create the issues
-   ```
-   It prints the earliest demo day and a fallback date.
-2. **On demo day:**
-   ```bash
-   npm run seed -- --refresh   # healthy issues re-enter their status; due dates re-anchor to today
-   npm run radar
-   ```
-3. **Optional:** `npm run radar -- --apply --dry-run` to show what would be written back to Jira.
-4. **Start over:** `npm run seed -- --reset` lists the `seed-demo` issues and deletes them after you type `yes`.
+**What `--demo-aging` does, and why it's honest.** Jira can't backdate, so a freshly seeded issue
+has been in its column for zero days. Only one rule depends on elapsed time: *stuck*. Everything
+else (due dates, flags, Blocked status, QA bounces, owners) is live Jira data from the first
+minute. `--demo-aging` simulates the wait by moving back one date, when the issue entered its
+current column, and only for `seed-demo` issues whose scenario is meant to be stuck (6 of 33).
+It never touches other issues, never makes an issue younger, and always prints which issues it
+aged. Without it, `--verify` shows 27/33 and explains that the 6 stuck scenarios haven't aged yet.
 
-**Short notice** (seeded the same day as the demo): skip the refresh and run
-`npm run radar -- --reference-date <fallback date printed by seed>`. Waiting statuses and In QA
-look stuck, In Progress doesn't. The contrast is between columns rather than within one.
+### A fully real demo (no simulation)
+Seed **at least 6 business days before the demo** (the longest stuck threshold + 1). On demo day:
+```bash
+npm run seed -- --refresh   # healthy issues re-enter their status; due dates re-anchor to today
+npm run radar
+```
+Stuck issues have then really sat for a week, while healthy ones restarted their clock today.
+
+**Optional:** `npm run radar -- --apply --dry-run` shows what would be written back to Jira.
+**Start over:** `npm run seed -- --reset` lists the `seed-demo` issues and deletes them after you type `yes`.
 
 The refresh moves healthy issues out and back **via To Do** (`seed.refreshViaStatus`). A route
 through In Progress would look like a QA bounce, so config validation rejects bounce statuses there.
